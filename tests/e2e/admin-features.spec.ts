@@ -143,13 +143,21 @@ test.describe('Admin Users Management', () => {
     await expect(deleteBtn).not.toBeVisible();
   });
 
-  test('non-admin employee login blocked from admin page', async ({ page }) => {
-    // empleado1 should not access admin
-    await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('login-user-code-input').fill('empleado1');
-    await page.getByTestId('login-password-input').fill('emp123');
-    await page.getByTestId('login-submit-button').click();
+  test('non-admin employee login blocked from admin page', async ({ browser }) => {
+    // Use fresh context to avoid admin session
+    const freshContext = await browser.newContext();
+    const freshPage = await freshContext.newPage();
+    
+    await freshPage.goto('/login', { waitUntil: 'domcontentloaded' });
+    await freshPage.getByTestId('login-user-code-input').fill('empleado1');
+    await freshPage.getByTestId('login-password-input').fill('emp123');
+    await freshPage.getByTestId('login-submit-button').click();
     // Should redirect to scanner, not admin
-    await expect(page).toHaveURL(/\/scanner/, { timeout: 15000 });
+    await expect(freshPage).toHaveURL(/\/scanner/, { timeout: 15000 });
+    // Attempt to access admin — should redirect to scanner
+    await freshPage.goto('/admin', { waitUntil: 'domcontentloaded' });
+    await expect(freshPage).toHaveURL(/\/scanner/, { timeout: 10000 });
+    
+    await freshContext.close();
   });
 });
