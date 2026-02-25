@@ -107,7 +107,7 @@ test.describe('Quoter - Price Logic Verification', () => {
     await expect(firstResult).toBeVisible();
     await firstResult.click({ force: true });
 
-    // At qty=1, price label should be P3 / Unidad
-    await expect(page.getByText('P3')).toBeVisible();
+    // At qty=1, price label should show "Unidad (1-11)" for P3
+    await expect(page.getByText('Unidad (1-11)')).toBeVisible();
   });
 });
