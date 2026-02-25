@@ -1,34 +1,76 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* App.css - Manrique Importadora PWA */
+
+/* Base styles handled by index.css / Tailwind */
+
+/* Scanner specific styles */
+#scanner-container video {
+  object-fit: cover;
+  border-radius: 0.75rem;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+#scanner-container #qr-shaded-region {
+  border-color: rgba(212, 165, 165, 0.5) !important;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Hide html5-qrcode branding */
+#scanner-container img[alt="Info icon"] {
+  display: none !important;
 }
 
-.App-link {
-    color: #61dafb;
+#scanner-container a[href*="scanapp"] {
+  display: none !important;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Animation utilities */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Responsive fixes */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* iOS Safari fixes */
+@supports (-webkit-touch-callout: none) {
+  .min-h-screen {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print,
+  nav,
+  footer,
+  button {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+  }
 }
