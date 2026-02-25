@@ -20,7 +20,8 @@ test.describe('Golden Path - Full User Journey', () => {
     await page.goto('/admin/products', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('add-product-button')).toBeVisible();
 
-    // Get initial product count
+    // Wait for products to load and check count
+    await expect(page.locator('[data-testid^="product-row-"]').first()).toBeVisible();
     const initialRows = await page.locator('[data-testid^="product-row-"]').count();
     expect(initialRows).toBeGreaterThan(0);
 
