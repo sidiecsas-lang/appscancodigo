@@ -151,8 +151,8 @@ test.describe('Golden Path - Full User Journey', () => {
     await expect(page.getByTestId(`quantity-${productId}`)).toHaveText('12');
     await expect(page.getByText('Mayor (12+)')).toBeVisible();
 
-    // Toggle bulk → P1 (Bulto)
+    // Toggle bulk → P1 (Bulto) - use the badge which is the price label (2nd match)
     await page.getByTestId(`bulk-switch-${productId}`).click();
-    await expect(page.getByText('Bulto')).toBeVisible();
+    await expect(page.getByText('Bulto').nth(1)).toBeVisible();
   });
 });
