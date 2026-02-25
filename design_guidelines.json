@@ -1,0 +1,172 @@
+{
+  "brand": {
+    "name": "Manrique Importadora",
+    "identity": {
+      "tone": "Quiet Luxury meets Efficient Utility",
+      "archetype": "Organic & Earthy (Professional Variant)",
+      "keywords": ["Minimalist", "Sober", "Elegant", "Efficient", "Clean"]
+    },
+    "colors": {
+      "primary": {
+        "name": "Palo Rosa Sutil",
+        "hex": "#D4A5A5",
+        "hsl": "356 33% 74%",
+        "usage": "Primary Actions, Highlights, Active States"
+      },
+      "secondary": {
+        "name": "Soft Black",
+        "hex": "#1A1A1A",
+        "hsl": "0 0% 10%",
+        "usage": "Headings, Strong Text, Contrast Elements"
+      },
+      "background": {
+        "default": "#FFFFFF",
+        "subtle": "#F8F8F8",
+        "paper": "#FFFFFF"
+      },
+      "text": {
+        "primary": "#1A1A1A",
+        "secondary": "#666666",
+        "muted": "#999999"
+      },
+      "status": {
+        "success": "#4B7F52",
+        "error": "#C14B4B",
+        "warning": "#D4A04B",
+        "info": "#4B7FB5"
+      },
+      "tailwind_vars": {
+        "background": "0 0% 100%",
+        "foreground": "0 0% 10%",
+        "primary": "356 33% 74%",
+        "primary-foreground": "0 0% 10%",
+        "secondary": "0 0% 98%",
+        "secondary-foreground": "0 0% 10%",
+        "muted": "0 0% 96%",
+        "muted-foreground": "0 0% 45%",
+        "accent": "356 33% 94%",
+        "accent-foreground": "356 33% 30%",
+        "border": "0 0% 90%",
+        "input": "0 0% 90%",
+        "ring": "356 33% 74%"
+      }
+    },
+    "typography": {
+      "headings": {
+        "family": "Playfair Display, serif",
+        "weights": ["400", "600"],
+        "tracking": "-0.02em",
+        "usage": "Page Titles, Hero Text, Modal Headers"
+      },
+      "body": {
+        "family": "DM Sans, sans-serif",
+        "weights": ["400", "500", "700"],
+        "tracking": "0.01em",
+        "usage": "UI Text, Data, Forms, Buttons"
+      },
+      "scale": {
+        "h1": "text-4xl md:text-5xl font-serif font-normal",
+        "h2": "text-2xl md:text-3xl font-serif font-normal",
+        "h3": "text-xl font-medium font-sans",
+        "body": "text-base font-sans text-gray-600",
+        "caption": "text-sm font-sans text-gray-500 uppercase tracking-wider"
+      }
+    }
+  },
+  "layout": {
+    "spacing": {
+      "base": "1rem",
+      "container_padding": "p-4 md:p-8 lg:p-12",
+      "section_gap": "gap-8 md:gap-12",
+      "component_gap": "gap-4"
+    },
+    "grid": {
+      "dashboard": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6",
+      "form": "grid grid-cols-1 md:grid-cols-2 gap-6",
+      "card_list": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+    },
+    "radius": {
+      "default": "rounded-lg",
+      "card": "rounded-xl",
+      "button": "rounded-md",
+      "input": "rounded-md"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#D4A5A5] hover:bg-[#C29090] text-[#1A1A1A] font-medium shadow-sm transition-all active:scale-95",
+      "secondary": "bg-gray-100 hover:bg-gray-200 text-gray-900",
+      "ghost": "hover:bg-gray-50 text-gray-600 hover:text-gray-900",
+      "destructive": "bg-red-50 text-red-600 hover:bg-red-100",
+      "outline": "border border-gray-200 bg-transparent hover:bg-gray-50"
+    },
+    "cards": {
+      "style": "bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200",
+      "interactive": "cursor-pointer hover:border-[#D4A5A5]/30"
+    },
+    "inputs": {
+      "style": "bg-white border-gray-200 focus:border-[#D4A5A5] focus:ring-[#D4A5A5]/20 h-11 transition-colors"
+    },
+    "modals": {
+      "overlay": "bg-black/20 backdrop-blur-sm",
+      "content": "bg-white border border-gray-100 shadow-xl"
+    }
+  },
+  "pwa_specifics": {
+    "navigation": {
+      "type": "Bottom Navigation Bar (Mobile)",
+      "style": "fixed bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-100 z-50 h-16 flex justify-around items-center pb-safe",
+      "active_state": "text-[#D4A5A5]",
+      "inactive_state": "text-gray-400"
+    },
+    "scanner": {
+      "viewport": "h-[60vh] rounded-2xl overflow-hidden relative border-2 border-white/20 shadow-inner",
+      "overlay": "absolute inset-0 border-2 border-[#D4A5A5]/50 rounded-lg m-12 animate-pulse"
+    },
+    "offline_indicator": {
+      "style": "fixed top-0 w-full bg-gray-900 text-white text-xs py-1 text-center z-50"
+    }
+  },
+  "admin_specifics": {
+    "sidebar": {
+      "style": "w-64 bg-white border-r border-gray-100 h-screen fixed left-0 top-0 hidden md:flex flex-col",
+      "item": "flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg mx-2 transition-colors",
+      "active": "bg-[#D4A5A5]/10 text-[#D4A5A5]"
+    },
+    "tables": {
+      "header": "bg-gray-50/50 text-xs uppercase tracking-wider text-gray-500 font-medium",
+      "row": "hover:bg-gray-50/50 transition-colors border-b border-gray-50"
+    },
+    "charts": {
+      "palette": ["#D4A5A5", "#A5B4D4", "#A5D4B4", "#D4CFA5"]
+    }
+  },
+  "assets": {
+    "logo_url": "https://customer-assets.emergentagent.com/job_manrique-beauty/artifacts/b6wvcecd_LogoPngManrique.png",
+    "login_bg": "https://images.unsplash.com/photo-1627811015433-368c148f6c3c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwyfHxtaW5pbWFsaXN0JTIwY29zbWV0aWNzfGVufDB8fHx8MTc3MjA2MDgzOXww&ixlib=rb-4.1.0&q=85",
+    "placeholder_product": "https://images.pexels.com/photos/7256060/pexels-photo-7256060.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+  },
+  "universal_guidelines": {
+    "anti_slop": [
+      "Avoid generic gradients. Use solid colors or subtle mesh gradients.",
+      "No 'Inter' font for headings. Use 'Playfair Display'.",
+      "Don't center everything. Use asymmetry for interest.",
+      "Use ample whitespace. Double the padding you think you need.",
+      "Micro-interactions are mandatory (hover, active, focus states)."
+    ],
+    "accessibility": {
+      "contrast": "Ensure text contrast ratio of 4.5:1",
+      "touch_targets": "Min 44x44px for all mobile interactive elements",
+      "labels": "All form inputs must have labels or aria-labels"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install 'lucide-react' for icons.",
+    "Install 'clsx' and 'tailwind-merge' for class handling.",
+    "Use 'react-router-dom' for routing.",
+    "Implement 'html5-qrcode' for the scanner page.",
+    "Use 'jspdf' and 'jspdf-autotable' for PDF generation.",
+    "Ensure 'manifest.json' is configured for PWA installation.",
+    "Update 'tailwind.config.js' with the specific colors defined in 'brand.colors.tailwind_vars'."
+  ]
+}
