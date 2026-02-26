@@ -305,20 +305,67 @@ export default function QuoterPage() {
       </header>
 
       <main className="p-4 space-y-4">
-        {/* Client Name */}
+        {/* Client Info */}
         <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <Label htmlFor="clientName" className="text-sm font-medium text-gray-700">
-              Nombre del Cliente (opcional)
-            </Label>
-            <Input
-              id="clientName"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder="Ingrese nombre del cliente"
-              className="mt-2 bg-gray-50/50"
-              data-testid="client-name-input"
-            />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Datos del Cliente (opcional)</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 space-y-3">
+            <div>
+              <Label htmlFor="clientName" className="text-sm font-medium text-gray-700">
+                Nombre
+              </Label>
+              <Input
+                id="clientName"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Nombre del cliente"
+                className="mt-1 bg-gray-50/50"
+                data-testid="client-name-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="clientPhone" className="text-sm font-medium text-gray-700">
+                  Teléfono
+                </Label>
+                <Input
+                  id="clientPhone"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder="0999999999"
+                  className="mt-1 bg-gray-50/50"
+                  data-testid="client-phone-input"
+                />
+              </div>
+              <div>
+                <Label htmlFor="clientEmail" className="text-sm font-medium text-gray-700">
+                  Correo
+                </Label>
+                <Input
+                  id="clientEmail"
+                  type="email"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  placeholder="correo@ejemplo.com"
+                  className="mt-1 bg-gray-50/50"
+                  data-testid="client-email-input"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="clientAddress" className="text-sm font-medium text-gray-700">
+                Dirección
+              </Label>
+              <Input
+                id="clientAddress"
+                value={clientAddress}
+                onChange={(e) => setClientAddress(e.target.value)}
+                placeholder="Dirección del cliente"
+                className="mt-1 bg-gray-50/50"
+                data-testid="client-address-input"
+              />
+            </div>
           </CardContent>
         </Card>
 
