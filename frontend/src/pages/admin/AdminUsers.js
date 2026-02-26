@@ -22,6 +22,7 @@ export default function AdminUsers() {
   const [form, setForm] = useState({
     user_code: '',
     password: '',
+    name: '',
     role: 'empleado'
   });
 
@@ -47,6 +48,7 @@ export default function AdminUsers() {
     setForm({
       user_code: '',
       password: '',
+      name: '',
       role: 'empleado'
     });
     setEditingUser(null);
@@ -56,6 +58,7 @@ export default function AdminUsers() {
     setForm({
       user_code: user.user_code,
       password: '',
+      name: user.name || '',
       role: user.role
     });
     setEditingUser(user);
@@ -68,7 +71,7 @@ export default function AdminUsers() {
 
     try {
       if (editingUser) {
-        const updateData = { role: form.role };
+        const updateData = { role: form.role, name: form.name };
         if (form.password) {
           updateData.password = form.password;
         }
