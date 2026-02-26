@@ -219,6 +219,7 @@ async def get_me(user: dict = Depends(get_current_user)):
     return UserResponse(
         id=user["id"],
         user_code=user["user_code"],
+        name=user.get("name", ""),
         role=user["role"],
         created_at=user["created_at"]
     )
@@ -240,6 +241,7 @@ async def create_user(user_data: UserCreate, admin: dict = Depends(get_admin_use
         "id": str(uuid.uuid4()),
         "user_code": user_data.user_code,
         "password": hash_password(user_data.password),
+        "name": user_data.name,
         "role": user_data.role,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -247,6 +249,7 @@ async def create_user(user_data: UserCreate, admin: dict = Depends(get_admin_use
     return UserResponse(
         id=user_doc["id"],
         user_code=user_doc["user_code"],
+        name=user_doc["name"],
         role=user_doc["role"],
         created_at=user_doc["created_at"]
     )
@@ -256,6 +259,8 @@ async def update_user(user_id: str, user_data: UserUpdate, admin: dict = Depends
     update_dict = {}
     if user_data.password:
         update_dict["password"] = hash_password(user_data.password)
+    if user_data.name is not None:
+        update_dict["name"] = user_data.name
     if user_data.role:
         update_dict["role"] = user_data.role
     
@@ -267,7 +272,7 @@ async def update_user(user_id: str, user_data: UserUpdate, admin: dict = Depends
         raise HTTPException(status_code=404, detail="User not found")
     
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
-    return UserResponse(**user)
+    return UserResponse(**{**user, "name": user.get("name", "")})
 
 @api_router.delete("/users/{user_id}")
 async def delete_user(user_id: str, admin: dict = Depends(get_admin_user)):
