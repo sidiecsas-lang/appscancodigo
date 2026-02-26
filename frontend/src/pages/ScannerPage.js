@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { API_URL, getToken, formatCurrency, LOGO_URL } from '../lib/utils';
 import { Card, CardContent } from '../components/ui/card';
@@ -7,12 +8,13 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Camera, X, Package, Barcode, Tag, AlertCircle, RefreshCw, Search } from 'lucide-react';
+import { Camera, X, Package, Barcode, Tag, AlertCircle, RefreshCw, Search, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import BottomNav from '../components/BottomNav';
 
 export default function ScannerPage() {
+  const navigate = useNavigate();
   const [scanning, setScanning] = useState(false);
   const [product, setProduct] = useState(null);
   const [showModal, setShowModal] = useState(false);
