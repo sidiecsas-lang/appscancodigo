@@ -136,10 +136,32 @@ export default function QuoterPage() {
       hour: '2-digit',
       minute: '2-digit'
     });
-    doc.text(`Fecha: ${date}`, 14, 60);
-    doc.text(`Vendedor: ${user?.user_code || 'N/A'}`, 14, 66);
+    
+    let yPos = 60;
+    doc.text(`Fecha: ${date}`, 14, yPos);
+    yPos += 6;
+    
+    // Vendedor info - show name if available
+    const vendorName = user?.name || user?.user_code || 'N/A';
+    doc.text(`Vendedor: ${vendorName}`, 14, yPos);
+    yPos += 6;
+    
+    // Client info
     if (clientName) {
-      doc.text(`Cliente: ${clientName}`, 14, 72);
+      doc.text(`Cliente: ${clientName}`, 14, yPos);
+      yPos += 6;
+    }
+    if (clientPhone) {
+      doc.text(`Teléfono: ${clientPhone}`, 14, yPos);
+      yPos += 6;
+    }
+    if (clientEmail) {
+      doc.text(`Email: ${clientEmail}`, 14, yPos);
+      yPos += 6;
+    }
+    if (clientAddress) {
+      doc.text(`Dirección: ${clientAddress}`, 14, yPos);
+      yPos += 6;
     }
     
     // Table
@@ -156,7 +178,7 @@ export default function QuoterPage() {
     });
     
     autoTable(doc, {
-      startY: clientName ? 80 : 74,
+      startY: yPos + 6,
       head: [['Código', 'Producto', 'Cant.', 'Tipo', 'P. Unit.', 'Subtotal']],
       body: tableData,
       theme: 'grid',
