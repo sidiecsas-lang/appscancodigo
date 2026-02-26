@@ -416,22 +416,36 @@ export default function ScannerPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="space-y-3 pt-2">
+                {/* Add to Quote Button */}
                 <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowModal(false)}
-                  data-testid="close-product-modal"
+                  className="w-full h-12 bg-[#1A1A1A] hover:bg-[#2A2A2A] text-white font-medium"
+                  onClick={handleAddToQuote}
+                  data-testid="add-to-quote-button"
                 >
-                  Cerrar
+                  <ShoppingCart className="mr-2 h-5 w-5" />
+                  Agregar al Cotizador
                 </Button>
-                <Button
-                  className="flex-1 bg-[#D4A5A5] hover:bg-[#C29090] text-[#1A1A1A]"
-                  onClick={handleScanAnother}
-                  data-testid="scan-another-button"
-                >
-                  Buscar Otro
-                </Button>
+                
+                {/* Secondary Actions */}
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowModal(false)}
+                    data-testid="close-product-modal"
+                  >
+                    Cerrar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleScanAnother}
+                    data-testid="scan-another-button"
+                  >
+                    Buscar Otro
+                  </Button>
+                </div>
               </div>
             </div>
           )}
