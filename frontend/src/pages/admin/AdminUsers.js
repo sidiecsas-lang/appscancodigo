@@ -251,6 +251,16 @@ export default function AdminUsers() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="name">Nombre Completo</Label>
+                <Input
+                  id="name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Ej: Juan Pérez García"
+                  data-testid="form-name"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="password">
                   {editingUser ? 'Nueva Contraseña (dejar vacío para no cambiar)' : 'Contraseña'}
                 </Label>
