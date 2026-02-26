@@ -463,7 +463,11 @@ async def create_quote(quote_data: QuoteCreate, user: dict = Depends(get_current
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
         "user_code": user["user_code"],
+        "user_name": user.get("name", ""),
         "client_name": quote_data.client_name,
+        "client_email": quote_data.client_email,
+        "client_phone": quote_data.client_phone,
+        "client_address": quote_data.client_address,
         "items": items,
         "total_amount": total,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -476,7 +480,15 @@ async def create_quote(quote_data: QuoteCreate, user: dict = Depends(get_current
 async def get_quotes(user: dict = Depends(get_current_user)):
     query = {} if user["role"] == "admin" else {"user_id": user["id"]}
     quotes = await db.quotes.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
-    return [QuoteResponse(**q) for q in quotes]
+    # Add default values for missing fields
+    result = []
+    for q in quotes:
+        q.setdefault("user_name", "")
+        q.setdefault("client_email", None)
+        q.setdefault("client_phone", None)
+        q.setdefault("client_address", None)
+        result.append(QuoteResponse(**q))
+    return result
 
 @api_router.get("/quotes/{quote_id}", response_model=QuoteResponse)
 async def get_quote(quote_id: str, user: dict = Depends(get_current_user)):
@@ -487,6 +499,10 @@ async def get_quote(quote_id: str, user: dict = Depends(get_current_user)):
     quote = await db.quotes.find_one(query, {"_id": 0})
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
+    quote.setdefault("user_name", "")
+    quote.setdefault("client_email", None)
+    quote.setdefault("client_phone", None)
+    quote.setdefault("client_address", None)
     return QuoteResponse(**quote)
 
 # ============ SCAN LOG ROUTES ============
