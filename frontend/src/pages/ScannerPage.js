@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { API_URL, getToken, formatCurrency, LOGO_URL } from '../lib/utils';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
-import { Camera, X, Package, Barcode, Tag, AlertCircle } from 'lucide-react';
+import { Camera, X, Package, Barcode, Tag, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import BottomNav from '../components/BottomNav';
@@ -15,123 +15,163 @@ export default function ScannerPage() {
   const [product, setProduct] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [cameraError, setCameraError] = useState(null);
-  const [cameras, setCameras] = useState([]);
-  const [selectedCamera, setSelectedCamera] = useState(null);
-  const scannerRef = useRef(null);
+  const [isInitializing, setIsInitializing] = useState(false);
   const html5QrcodeRef = useRef(null);
+  const mountedRef = useRef(true);
 
-  // Get available cameras on mount
+  // Cleanup on unmount
   useEffect(() => {
-    Html5Qrcode.getCameras()
-      .then((devices) => {
-        if (devices && devices.length > 0) {
-          setCameras(devices);
-          // Prefer back camera
-          const backCamera = devices.find(d => 
-            d.label.toLowerCase().includes('back') || 
-            d.label.toLowerCase().includes('rear') ||
-            d.label.toLowerCase().includes('trasera') ||
-            d.label.toLowerCase().includes('environment')
-          );
-          setSelectedCamera(backCamera?.id || devices[0].id);
-        }
-      })
-      .catch((err) => {
-        console.log('Error getting cameras:', err);
-      });
-
+    mountedRef.current = true;
     return () => {
-      stopScanner();
+      mountedRef.current = false;
+      cleanupScanner();
     };
   }, []);
 
-  const startScanner = async () => {
-    setCameraError(null);
-    
-    try {
-      if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode("scanner-container");
-      }
-
-      const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-      };
-
-      // Try to use selected camera or environment facing mode
-      const cameraConfig = selectedCamera 
-        ? { deviceId: { exact: selectedCamera } }
-        : { facingMode: "environment" };
-
-      await html5QrcodeRef.current.start(
-        cameraConfig,
-        config,
-        onScanSuccess,
-        () => {} // Silent scan errors
-      );
-      
-      setScanning(true);
-      toast.success('Cámara activada');
-      
-    } catch (err) {
-      console.error('Scanner error:', err);
-      
-      let errorMessage = 'No se pudo acceder a la cámara.';
-      
-      if (err.toString().includes('NotAllowedError') || err.toString().includes('Permission')) {
-        errorMessage = 'Permiso de cámara denegado. Por favor habilita el acceso a la cámara en la configuración de tu navegador.';
-      } else if (err.toString().includes('NotFoundError')) {
-        errorMessage = 'No se encontró ninguna cámara en este dispositivo.';
-      } else if (err.toString().includes('NotReadableError')) {
-        errorMessage = 'La cámara está siendo usada por otra aplicación.';
-      } else if (err.toString().includes('OverconstrainedError')) {
-        errorMessage = 'No se pudo configurar la cámara con los parámetros solicitados.';
-      }
-      
-      setCameraError(errorMessage);
-      toast.error(errorMessage);
-    }
-  };
-
-  const stopScanner = async () => {
+  const cleanupScanner = async () => {
     if (html5QrcodeRef.current) {
       try {
         const state = html5QrcodeRef.current.getState();
-        if (state === 2) { // SCANNING state
+        // State 2 = SCANNING, State 3 = PAUSED
+        if (state === 2 || state === 3) {
           await html5QrcodeRef.current.stop();
         }
+        html5QrcodeRef.current.clear();
       } catch (err) {
-        console.log('Stop scanner error:', err);
+        console.log('Cleanup error (safe to ignore):', err);
       }
+      html5QrcodeRef.current = null;
     }
-    setScanning(false);
   };
 
-  const onScanSuccess = async (decodedText) => {
-    // Stop scanner first
-    await stopScanner();
+  const startScanner = async () => {
+    if (isInitializing) return;
     
+    setCameraError(null);
+    setIsInitializing(true);
+
+    try {
+      // Cleanup any existing instance first
+      await cleanupScanner();
+
+      // Small delay to ensure DOM is ready
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      if (!mountedRef.current) return;
+
+      // Create new instance
+      html5QrcodeRef.current = new Html5Qrcode("scanner-container", {
+        verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      });
+
+      const config = {
+        fps: 10,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const boxSize = Math.floor(minEdge * 0.7);
+          return { width: boxSize, height: boxSize };
+        },
+        aspectRatio: 1.0,
+        disableFlip: false,
+      };
+
+      // Start with environment facing camera (back camera on mobile)
+      await html5QrcodeRef.current.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        () => {} // Ignore scan errors
+      );
+
+      if (mountedRef.current) {
+        setScanning(true);
+        setIsInitializing(false);
+        toast.success('Cámara lista - apunta al código');
+      }
+
+    } catch (err) {
+      console.error('Scanner start error:', err);
+      setIsInitializing(false);
+
+      if (!mountedRef.current) return;
+
+      let errorMsg = 'No se pudo acceder a la cámara.';
+      const errorStr = err.toString().toLowerCase();
+
+      if (errorStr.includes('notallowed') || errorStr.includes('permission')) {
+        errorMsg = 'Permiso de cámara denegado. Habilita el acceso en la configuración del navegador.';
+      } else if (errorStr.includes('notfound') || errorStr.includes('requested device not found')) {
+        errorMsg = 'No se encontró cámara en este dispositivo.';
+      } else if (errorStr.includes('notreadable') || errorStr.includes('could not start')) {
+        errorMsg = 'La cámara está en uso por otra aplicación. Cierra otras apps y vuelve a intentar.';
+      } else if (errorStr.includes('overconstrained')) {
+        // Try again without facingMode constraint
+        try {
+          await html5QrcodeRef.current.start(
+            { facingMode: "user" }, // Try front camera
+            config,
+            onScanSuccess,
+            () => {}
+          );
+          if (mountedRef.current) {
+            setScanning(true);
+            setIsInitializing(false);
+            toast.success('Usando cámara frontal');
+          }
+          return;
+        } catch (e2) {
+          errorMsg = 'No se pudo configurar ninguna cámara disponible.';
+        }
+      }
+
+      setCameraError(errorMsg);
+      toast.error(errorMsg);
+    }
+  };
+
+  const stopScanner = useCallback(async () => {
+    setIsInitializing(false);
+    await cleanupScanner();
+    if (mountedRef.current) {
+      setScanning(false);
+    }
+  }, []);
+
+  const onScanSuccess = async (decodedText) => {
+    if (!mountedRef.current) return;
+
+    // Stop scanning immediately
+    await stopScanner();
+
     try {
       const token = getToken();
       const response = await axios.get(`${API_URL}/products/scan/${decodedText}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      setProduct(response.data);
-      setShowModal(true);
-      toast.success('¡Producto encontrado!');
-      
-      // Log the scan silently
-      await axios.post(`${API_URL}/scan-logs`, 
+
+      if (mountedRef.current) {
+        setProduct(response.data);
+        setShowModal(true);
+        toast.success('¡Producto encontrado!');
+      }
+
+      // Log scan silently
+      axios.post(`${API_URL}/scan-logs`,
         { product_id: response.data.id },
-        { headers: { Authorization: `Bearer ${token}` }}
+        { headers: { Authorization: `Bearer ${token}` } }
       ).catch(() => {});
-      
+
     } catch (error) {
-      toast.error('Producto no encontrado en el catálogo');
-      // Restart scanner after error
-      setTimeout(() => startScanner(), 1500);
+      if (mountedRef.current) {
+        toast.error('Producto no encontrado en el catálogo');
+        // Restart scanner after showing error
+        setTimeout(() => {
+          if (mountedRef.current) startScanner();
+        }, 2000);
+      }
     }
   };
 
@@ -165,50 +205,44 @@ export default function ScannerPage() {
               <p className="text-gray-500 mb-6">
                 Apunta la cámara hacia el código de barras o QR del producto
               </p>
-              
-              {/* Camera Error Message */}
+
+              {/* Camera Error */}
               {cameraError && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-left">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-red-700">{cameraError}</p>
-                      <p className="text-xs text-red-500 mt-2">
-                        En iOS Safari: Configuración → Safari → Cámara → Permitir
-                        <br />
-                        En Android Chrome: Toca el ícono de candado junto a la URL → Permisos → Cámara
-                      </p>
+                    <div className="flex-1">
+                      <p className="text-sm text-red-700 font-medium">{cameraError}</p>
+                      <div className="text-xs text-red-600 mt-2 space-y-1">
+                        <p><strong>Android Chrome:</strong> Toca el candado 🔒 → Permisos → Cámara → Permitir</p>
+                        <p><strong>iOS Safari:</strong> Configuración → Safari → Cámara → Permitir</p>
+                        <p><strong>Tip:</strong> Intenta recargar la página después de dar permisos</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Camera selector if multiple cameras */}
-              {cameras.length > 1 && (
-                <div className="mb-4">
-                  <label className="text-sm text-gray-600 block mb-2">Seleccionar cámara:</label>
-                  <select
-                    value={selectedCamera || ''}
-                    onChange={(e) => setSelectedCamera(e.target.value)}
-                    className="w-full p-2 border border-gray-200 rounded-lg text-sm"
-                    data-testid="camera-select"
-                  >
-                    {cameras.map((camera) => (
-                      <option key={camera.id} value={camera.id}>
-                        {camera.label || `Cámara ${camera.id.slice(0, 8)}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              
-              <Button 
+              {/* Hidden container for scanner initialization */}
+              <div id="scanner-container" style={{ display: 'none' }}></div>
+
+              <Button
                 onClick={startScanner}
-                className="bg-[#D4A5A5] hover:bg-[#C29090] text-[#1A1A1A] font-medium px-8 h-12"
+                disabled={isInitializing}
+                className="bg-[#D4A5A5] hover:bg-[#C29090] text-[#1A1A1A] font-medium px-8 h-12 disabled:opacity-50"
                 data-testid="start-scanner-button"
               >
-                <Camera className="mr-2 h-5 w-5" />
-                Iniciar Escáner
+                {isInitializing ? (
+                  <>
+                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                    Iniciando...
+                  </>
+                ) : (
+                  <>
+                    <Camera className="mr-2 h-5 w-5" />
+                    {cameraError ? 'Reintentar' : 'Iniciar Escáner'}
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -216,21 +250,25 @@ export default function ScannerPage() {
           <Card className="border-0 shadow-lg overflow-hidden">
             <CardContent className="p-0">
               <div className="relative bg-black rounded-lg overflow-hidden">
-                <div 
-                  id="scanner-container" 
-                  ref={scannerRef}
-                  className="w-full min-h-[400px]"
+                {/* Scanner container */}
+                <div
+                  id="scanner-container"
+                  className="w-full"
+                  style={{ minHeight: '400px' }}
                   data-testid="scanner-container"
                 />
-                {/* Scanning overlay */}
+
+                {/* Overlay frame */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-64 h-64 border-2 border-[#D4A5A5] rounded-lg relative">
-                    <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-[#D4A5A5] rounded-tl-lg"></div>
-                    <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-[#D4A5A5] rounded-tr-lg"></div>
-                    <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-[#D4A5A5] rounded-bl-lg"></div>
-                    <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-[#D4A5A5] rounded-br-lg"></div>
+                  <div className="w-64 h-64 relative">
+                    <div className="absolute -top-1 -left-1 w-10 h-10 border-t-4 border-l-4 border-[#D4A5A5] rounded-tl-lg"></div>
+                    <div className="absolute -top-1 -right-1 w-10 h-10 border-t-4 border-r-4 border-[#D4A5A5] rounded-tr-lg"></div>
+                    <div className="absolute -bottom-1 -left-1 w-10 h-10 border-b-4 border-l-4 border-[#D4A5A5] rounded-bl-lg"></div>
+                    <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-[#D4A5A5] rounded-br-lg"></div>
                   </div>
                 </div>
+
+                {/* Cancel button */}
                 <Button
                   onClick={stopScanner}
                   variant="secondary"
@@ -240,9 +278,11 @@ export default function ScannerPage() {
                   <X className="h-4 w-4 mr-1" />
                   Cancelar
                 </Button>
+
+                {/* Bottom instruction */}
                 <div className="absolute bottom-4 left-0 right-0 text-center">
-                  <span className="bg-black/50 text-white text-sm px-4 py-2 rounded-full">
-                    Apunta al código de barras
+                  <span className="bg-black/60 text-white text-sm px-4 py-2 rounded-full">
+                    Centra el código en el recuadro
                   </span>
                 </div>
               </div>
@@ -260,19 +300,19 @@ export default function ScannerPage() {
               <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium text-[#D4A5A5]">1</span>
               </div>
-              <p className="text-sm text-gray-600">Presiona "Iniciar Escáner" y permite el acceso a la cámara</p>
+              <p className="text-sm text-gray-600">Presiona "Iniciar Escáner" y <strong>permite el acceso a la cámara</strong></p>
             </div>
             <div className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray-100">
               <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium text-[#D4A5A5]">2</span>
               </div>
-              <p className="text-sm text-gray-600">Apunta hacia el código de barras o QR del producto</p>
+              <p className="text-sm text-gray-600">Apunta hacia el código de barras del producto</p>
             </div>
             <div className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray-100">
               <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium text-[#D4A5A5]">3</span>
               </div>
-              <p className="text-sm text-gray-600">Los detalles del producto aparecerán automáticamente</p>
+              <p className="text-sm text-gray-600">La información aparecerá automáticamente</p>
             </div>
           </div>
         </div>
@@ -286,17 +326,15 @@ export default function ScannerPage() {
               Información del Producto
             </DialogTitle>
           </DialogHeader>
-          
+
           {product && (
             <div className="space-y-4 py-4">
-              {/* Product Name */}
               <div className="text-center">
                 <h3 className="font-medium text-[#1A1A1A] text-lg leading-tight" data-testid="product-name">
                   {product.name}
                 </h3>
               </div>
 
-              {/* Codes */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
@@ -318,7 +356,6 @@ export default function ScannerPage() {
                 </div>
               </div>
 
-              {/* Prices */}
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                   <Tag size={14} />
@@ -346,17 +383,16 @@ export default function ScannerPage() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3 pt-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="flex-1"
                   onClick={() => setShowModal(false)}
                   data-testid="close-product-modal"
                 >
                   Cerrar
                 </Button>
-                <Button 
+                <Button
                   className="flex-1 bg-[#D4A5A5] hover:bg-[#C29090] text-[#1A1A1A]"
                   onClick={handleScanAnother}
                   data-testid="scan-another-button"
