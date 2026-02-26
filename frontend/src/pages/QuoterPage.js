@@ -21,6 +21,9 @@ export default function QuoterPage() {
   const [searchResults, setSearchResults] = useState([]);
   const [quoteItems, setQuoteItems] = useState([]);
   const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
