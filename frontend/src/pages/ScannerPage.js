@@ -17,113 +17,89 @@ export default function ScannerPage() {
   const [cameraError, setCameraError] = useState(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const html5QrcodeRef = useRef(null);
-  const mountedRef = useRef(true);
+  const isScanningRef = useRef(false);
 
-  // Cleanup on unmount
+  // Cleanup on unmount only
   useEffect(() => {
-    mountedRef.current = true;
     return () => {
-      mountedRef.current = false;
-      cleanupScanner();
+      if (html5QrcodeRef.current && isScanningRef.current) {
+        html5QrcodeRef.current.stop().catch(() => {});
+      }
     };
   }, []);
 
-  const cleanupScanner = async () => {
-    if (html5QrcodeRef.current) {
-      try {
-        const state = html5QrcodeRef.current.getState();
-        // State 2 = SCANNING, State 3 = PAUSED
-        if (state === 2 || state === 3) {
-          await html5QrcodeRef.current.stop();
-        }
-        html5QrcodeRef.current.clear();
-      } catch (err) {
-        console.log('Cleanup error (safe to ignore):', err);
-      }
-      html5QrcodeRef.current = null;
-    }
-  };
-
   const startScanner = async () => {
-    if (isInitializing) return;
+    if (isInitializing || isScanningRef.current) return;
     
     setCameraError(null);
     setIsInitializing(true);
 
     try {
-      // Cleanup any existing instance first
-      await cleanupScanner();
+      // Create instance only once
+      if (!html5QrcodeRef.current) {
+        html5QrcodeRef.current = new Html5Qrcode("scanner-container", {
+          verbose: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
+        });
+      }
 
-      // Small delay to ensure DOM is ready
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      if (!mountedRef.current) return;
-
-      // Create new instance
-      html5QrcodeRef.current = new Html5Qrcode("scanner-container", {
-        verbose: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
-        }
-      });
+      // If already scanning, stop first
+      if (isScanningRef.current) {
+        await html5QrcodeRef.current.stop();
+        isScanningRef.current = false;
+      }
 
       const config = {
         fps: 10,
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const boxSize = Math.floor(minEdge * 0.7);
-          return { width: boxSize, height: boxSize };
-        },
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
       };
 
-      // Start with environment facing camera (back camera on mobile)
       await html5QrcodeRef.current.start(
         { facingMode: "environment" },
         config,
         onScanSuccess,
-        () => {} // Ignore scan errors
+        () => {}
       );
 
-      if (mountedRef.current) {
-        setScanning(true);
-        setIsInitializing(false);
-        toast.success('Cámara lista - apunta al código');
-      }
+      isScanningRef.current = true;
+      setScanning(true);
+      setIsInitializing(false);
+      toast.success('Cámara lista');
 
     } catch (err) {
-      console.error('Scanner start error:', err);
+      console.error('Scanner error:', err);
       setIsInitializing(false);
+      isScanningRef.current = false;
 
-      if (!mountedRef.current) return;
-
-      let errorMsg = 'No se pudo acceder a la cámara.';
       const errorStr = err.toString().toLowerCase();
+      let errorMsg = 'No se pudo acceder a la cámara.';
 
       if (errorStr.includes('notallowed') || errorStr.includes('permission')) {
-        errorMsg = 'Permiso de cámara denegado. Habilita el acceso en la configuración del navegador.';
-      } else if (errorStr.includes('notfound') || errorStr.includes('requested device not found')) {
-        errorMsg = 'No se encontró cámara en este dispositivo.';
+        errorMsg = 'Permiso de cámara denegado.';
+      } else if (errorStr.includes('notfound')) {
+        errorMsg = 'No se encontró cámara.';
       } else if (errorStr.includes('notreadable') || errorStr.includes('could not start')) {
-        errorMsg = 'La cámara está en uso por otra aplicación. Cierra otras apps y vuelve a intentar.';
+        errorMsg = 'Cámara en uso por otra app.';
       } else if (errorStr.includes('overconstrained')) {
-        // Try again without facingMode constraint
+        // Try with user-facing camera
         try {
           await html5QrcodeRef.current.start(
-            { facingMode: "user" }, // Try front camera
+            { facingMode: "user" },
             config,
             onScanSuccess,
             () => {}
           );
-          if (mountedRef.current) {
-            setScanning(true);
-            setIsInitializing(false);
-            toast.success('Usando cámara frontal');
-          }
+          isScanningRef.current = true;
+          setScanning(true);
+          setIsInitializing(false);
+          toast.success('Usando cámara frontal');
           return;
-        } catch (e2) {
-          errorMsg = 'No se pudo configurar ninguna cámara disponible.';
+        } catch {
+          errorMsg = 'No hay cámaras disponibles.';
         }
       }
 
@@ -133,18 +109,30 @@ export default function ScannerPage() {
   };
 
   const stopScanner = useCallback(async () => {
-    setIsInitializing(false);
-    await cleanupScanner();
-    if (mountedRef.current) {
-      setScanning(false);
+    if (html5QrcodeRef.current && isScanningRef.current) {
+      try {
+        await html5QrcodeRef.current.stop();
+      } catch (err) {
+        console.log('Stop error:', err);
+      }
     }
+    isScanningRef.current = false;
+    setScanning(false);
+    setIsInitializing(false);
   }, []);
 
-  const onScanSuccess = async (decodedText) => {
-    if (!mountedRef.current) return;
-
-    // Stop scanning immediately
-    await stopScanner();
+  const onScanSuccess = useCallback(async (decodedText) => {
+    // Prevent multiple scans
+    if (!isScanningRef.current) return;
+    
+    // Stop immediately
+    if (html5QrcodeRef.current) {
+      try {
+        await html5QrcodeRef.current.stop();
+      } catch {}
+    }
+    isScanningRef.current = false;
+    setScanning(false);
 
     try {
       const token = getToken();
@@ -152,28 +140,21 @@ export default function ScannerPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (mountedRef.current) {
-        setProduct(response.data);
-        setShowModal(true);
-        toast.success('¡Producto encontrado!');
-      }
+      setProduct(response.data);
+      setShowModal(true);
+      toast.success('¡Producto encontrado!');
 
-      // Log scan silently
+      // Log scan
       axios.post(`${API_URL}/scan-logs`,
         { product_id: response.data.id },
         { headers: { Authorization: `Bearer ${token}` } }
       ).catch(() => {});
 
-    } catch (error) {
-      if (mountedRef.current) {
-        toast.error('Producto no encontrado en el catálogo');
-        // Restart scanner after showing error
-        setTimeout(() => {
-          if (mountedRef.current) startScanner();
-        }, 2000);
-      }
+    } catch {
+      toast.error('Producto no encontrado');
+      setTimeout(() => startScanner(), 1500);
     }
-  };
+  }, []);
 
   const handleScanAnother = () => {
     setShowModal(false);
@@ -191,75 +172,22 @@ export default function ScannerPage() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="p-4">
-        {!scanning ? (
-          <Card className="border-0 shadow-lg overflow-hidden">
-            <CardContent className="p-8 text-center">
-              <div className="w-24 h-24 mx-auto mb-6 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center">
-                <Camera className="w-12 h-12 text-[#D4A5A5]" />
-              </div>
-              <h2 className="text-xl font-serif text-[#1A1A1A] mb-2">
-                Escanear Producto
-              </h2>
-              <p className="text-gray-500 mb-6">
-                Apunta la cámara hacia el código de barras o QR del producto
-              </p>
-
-              {/* Camera Error */}
-              {cameraError && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-left">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-red-700 font-medium">{cameraError}</p>
-                      <div className="text-xs text-red-600 mt-2 space-y-1">
-                        <p><strong>Android Chrome:</strong> Toca el candado 🔒 → Permisos → Cámara → Permitir</p>
-                        <p><strong>iOS Safari:</strong> Configuración → Safari → Cámara → Permitir</p>
-                        <p><strong>Tip:</strong> Intenta recargar la página después de dar permisos</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Hidden container for scanner initialization */}
-              <div id="scanner-container" style={{ display: 'none' }}></div>
-
-              <Button
-                onClick={startScanner}
-                disabled={isInitializing}
-                className="bg-[#D4A5A5] hover:bg-[#C29090] text-[#1A1A1A] font-medium px-8 h-12 disabled:opacity-50"
-                data-testid="start-scanner-button"
-              >
-                {isInitializing ? (
-                  <>
-                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                    Iniciando...
-                  </>
-                ) : (
-                  <>
-                    <Camera className="mr-2 h-5 w-5" />
-                    {cameraError ? 'Reintentar' : 'Iniciar Escáner'}
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-0 shadow-lg overflow-hidden">
-            <CardContent className="p-0">
-              <div className="relative bg-black rounded-lg overflow-hidden">
-                {/* Scanner container */}
-                <div
-                  id="scanner-container"
-                  className="w-full"
-                  style={{ minHeight: '400px' }}
-                  data-testid="scanner-container"
-                />
-
-                {/* Overlay frame */}
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+        {/* Scanner Card - Always in DOM */}
+        <Card className="border-0 shadow-lg overflow-hidden">
+          <CardContent className="p-0">
+            {/* Scanner Container - Always present, visibility controlled by CSS */}
+            <div 
+              id="scanner-container"
+              className={`w-full ${scanning ? 'block' : 'hidden'}`}
+              style={{ minHeight: scanning ? '400px' : '0' }}
+              data-testid="scanner-container"
+            />
+            
+            {/* Overlay when scanning */}
+            {scanning && (
+              <>
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ position: 'relative', marginTop: '-400px', height: '400px' }}>
                   <div className="w-64 h-64 relative">
                     <div className="absolute -top-1 -left-1 w-10 h-10 border-t-4 border-l-4 border-[#D4A5A5] rounded-tl-lg"></div>
                     <div className="absolute -top-1 -right-1 w-10 h-10 border-t-4 border-r-4 border-[#D4A5A5] rounded-tr-lg"></div>
@@ -267,55 +195,99 @@ export default function ScannerPage() {
                     <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-[#D4A5A5] rounded-br-lg"></div>
                   </div>
                 </div>
-
-                {/* Cancel button */}
-                <Button
-                  onClick={stopScanner}
-                  variant="secondary"
-                  className="absolute top-4 right-4 z-50 bg-white/90 hover:bg-white shadow-lg"
-                  data-testid="stop-scanner-button"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Cancelar
-                </Button>
-
-                {/* Bottom instruction */}
-                <div className="absolute bottom-4 left-0 right-0 text-center">
-                  <span className="bg-black/60 text-white text-sm px-4 py-2 rounded-full">
-                    Centra el código en el recuadro
-                  </span>
+                <div className="flex justify-between items-center p-4 bg-gray-900">
+                  <span className="text-white text-sm">Apunta al código de barras</span>
+                  <Button
+                    onClick={stopScanner}
+                    variant="secondary"
+                    size="sm"
+                    data-testid="stop-scanner-button"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Cancelar
+                  </Button>
                 </div>
+              </>
+            )}
+
+            {/* Start Scanner UI */}
+            {!scanning && (
+              <div className="p-8 text-center">
+                <div className="w-24 h-24 mx-auto mb-6 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center">
+                  <Camera className="w-12 h-12 text-[#D4A5A5]" />
+                </div>
+                <h2 className="text-xl font-serif text-[#1A1A1A] mb-2">
+                  Escanear Producto
+                </h2>
+                <p className="text-gray-500 mb-6">
+                  Apunta la cámara hacia el código de barras o QR
+                </p>
+
+                {cameraError && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-left">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm text-red-700 font-medium">{cameraError}</p>
+                        <p className="text-xs text-red-600 mt-2">
+                          Verifica los permisos de cámara en tu navegador
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  onClick={startScanner}
+                  disabled={isInitializing}
+                  className="bg-[#D4A5A5] hover:bg-[#C29090] text-[#1A1A1A] font-medium px-8 h-12"
+                  data-testid="start-scanner-button"
+                >
+                  {isInitializing ? (
+                    <>
+                      <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                      Iniciando...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="mr-2 h-5 w-5" />
+                      {cameraError ? 'Reintentar' : 'Iniciar Escáner'}
+                    </>
+                  )}
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         {/* Instructions */}
-        <div className="mt-6 space-y-3">
-          <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">
-            Instrucciones
-          </h3>
-          <div className="grid gap-3">
-            <div className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray-100">
-              <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-medium text-[#D4A5A5]">1</span>
+        {!scanning && (
+          <div className="mt-6 space-y-3">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">
+              Instrucciones
+            </h3>
+            <div className="grid gap-3">
+              <div className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray-100">
+                <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-medium text-[#D4A5A5]">1</span>
+                </div>
+                <p className="text-sm text-gray-600">Presiona el botón y <strong>permite el acceso a la cámara</strong></p>
               </div>
-              <p className="text-sm text-gray-600">Presiona "Iniciar Escáner" y <strong>permite el acceso a la cámara</strong></p>
-            </div>
-            <div className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray-100">
-              <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-medium text-[#D4A5A5]">2</span>
+              <div className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray-100">
+                <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-medium text-[#D4A5A5]">2</span>
+                </div>
+                <p className="text-sm text-gray-600">Apunta hacia el código de barras del producto</p>
               </div>
-              <p className="text-sm text-gray-600">Apunta hacia el código de barras del producto</p>
-            </div>
-            <div className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray-100">
-              <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-medium text-[#D4A5A5]">3</span>
+              <div className="flex items-start gap-3 bg-white p-4 rounded-lg border border-gray-100">
+                <div className="w-8 h-8 bg-[#D4A5A5]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-medium text-[#D4A5A5]">3</span>
+                </div>
+                <p className="text-sm text-gray-600">La información aparecerá automáticamente</p>
               </div>
-              <p className="text-sm text-gray-600">La información aparecerá automáticamente</p>
             </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Product Modal */}
