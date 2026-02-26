@@ -154,6 +154,7 @@ export default function AdminUsers() {
               <TableHeader className="bg-gray-50/50">
                 <TableRow>
                   <TableHead className="text-xs uppercase tracking-wider">Código</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider">Nombre</TableHead>
                   <TableHead className="text-xs uppercase tracking-wider">Rol</TableHead>
                   <TableHead className="text-xs uppercase tracking-wider">Fecha de Creación</TableHead>
                   <TableHead className="text-xs uppercase tracking-wider text-center">Acciones</TableHead>
@@ -162,13 +163,13 @@ export default function AdminUsers() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-10 text-gray-400">
+                    <TableCell colSpan={5} className="text-center py-10 text-gray-400">
                       Cargando usuarios...
                     </TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-10 text-gray-400">
+                    <TableCell colSpan={5} className="text-center py-10 text-gray-400">
                       No hay usuarios
                     </TableCell>
                   </TableRow>
@@ -176,6 +177,7 @@ export default function AdminUsers() {
                   users.map((user) => (
                     <TableRow key={user.id} className="hover:bg-gray-50/50" data-testid={`user-row-${user.id}`}>
                       <TableCell className="font-medium">{user.user_code}</TableCell>
+                      <TableCell className="text-sm">{user.name || '-'}</TableCell>
                       <TableCell>
                         <Badge 
                           variant={user.role === 'admin' ? 'default' : 'secondary'}
