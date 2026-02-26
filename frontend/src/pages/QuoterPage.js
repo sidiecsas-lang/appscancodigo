@@ -52,6 +52,38 @@ export default function QuoterPage() {
     return () => clearTimeout(debounce);
   }, [searchTerm]);
 
+  // Check for pending product from scanner
+  useEffect(() => {
+    const pendingProduct = localStorage.getItem('pendingQuoteProduct');
+    if (pendingProduct) {
+      try {
+        const product = JSON.parse(pendingProduct);
+        // Remove from localStorage immediately
+        localStorage.removeItem('pendingQuoteProduct');
+        // Add to quote
+        const existing = quoteItems.find(item => item.product.id === product.id);
+        if (existing) {
+          setQuoteItems(prev => prev.map(item => 
+            item.product.id === product.id 
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          ));
+          toast.success('Cantidad actualizada');
+        } else {
+          setQuoteItems(prev => [...prev, {
+            product,
+            quantity: 1,
+            isBulk: false
+          }]);
+          toast.success('Producto agregado desde escáner');
+        }
+      } catch (e) {
+        console.error('Error parsing pending product:', e);
+        localStorage.removeItem('pendingQuoteProduct');
+      }
+    }
+  }, []);
+
   // Add product to quote
   const addToQuote = (product) => {
     const existing = quoteItems.find(item => item.product.id === product.id);
