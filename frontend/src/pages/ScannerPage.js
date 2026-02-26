@@ -165,6 +165,18 @@ export default function ScannerPage() {
     }
   };
 
+  const handleAddToQuote = () => {
+    if (product) {
+      // Save product to localStorage for the quoter to pick up
+      localStorage.setItem('pendingQuoteProduct', JSON.stringify(product));
+      setShowModal(false);
+      toast.success('Producto agregado, redirigiendo al cotizador...');
+      setTimeout(() => {
+        navigate('/quoter');
+      }, 500);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
