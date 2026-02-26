@@ -45,16 +45,19 @@ class UserBase(BaseModel):
 class UserCreate(BaseModel):
     user_code: str
     password: str
+    name: str = ""  # Nombre completo del usuario
     role: str = "empleado"
 
 class UserUpdate(BaseModel):
     password: Optional[str] = None
+    name: Optional[str] = None
     role: Optional[str] = None
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     user_code: str
+    name: str = ""
     role: str
     created_at: str
 
@@ -107,6 +110,9 @@ class QuoteItemResponse(BaseModel):
 
 class QuoteCreate(BaseModel):
     client_name: Optional[str] = None
+    client_email: Optional[str] = None
+    client_phone: Optional[str] = None
+    client_address: Optional[str] = None
     items: List[QuoteItemCreate]
 
 class QuoteResponse(BaseModel):
@@ -114,7 +120,11 @@ class QuoteResponse(BaseModel):
     id: str
     user_id: str
     user_code: str
-    client_name: Optional[str]
+    user_name: str = ""  # Nombre completo del empleado
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
+    client_phone: Optional[str] = None
+    client_address: Optional[str] = None
     items: List[QuoteItemResponse]
     total_amount: float
     created_at: str
@@ -198,6 +208,7 @@ async def login(request: LoginRequest):
         user=UserResponse(
             id=user["id"],
             user_code=user["user_code"],
+            name=user.get("name", ""),
             role=user["role"],
             created_at=user["created_at"]
         )
