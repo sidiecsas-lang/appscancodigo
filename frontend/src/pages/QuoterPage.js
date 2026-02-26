@@ -235,6 +235,9 @@ export default function QuoterPage() {
       const token = getToken();
       await axios.post(`${API_URL}/quotes`, {
         client_name: clientName || null,
+        client_email: clientEmail || null,
+        client_phone: clientPhone || null,
+        client_address: clientAddress || null,
         items: quoteItems.map(item => ({
           product_id: item.product.id,
           quantity: item.quantity,
