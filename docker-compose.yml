@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Backend - FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: manrique-backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGO_URL=mongodb://admin_manrique:Clave@host.docker.internal:27017
+      - DB_NAME=manrique_db
+      - JWT_SECRET=tu-clave-secreta-muy-segura-cambiar-en-produccion
+      - CORS_ORIGINS=*
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - manrique-network
+
+  # Frontend - React + Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_BACKEND_URL=https://tu-dominio.com
+    container_name: manrique-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - manrique-network
+
+networks:
+  manrique-network:
+    driver: bridge
