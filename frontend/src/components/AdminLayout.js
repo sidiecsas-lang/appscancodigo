@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LOGO_URL } from '../lib/utils';
 import { Button } from '../components/ui/button';
-import { LayoutDashboard, Package, Users, Camera, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, Users, Camera, LogOut, Menu, X, Receipt } from 'lucide-react';
 import { useState } from 'react';
 
 export default function AdminLayout({ children }) {
@@ -14,6 +14,7 @@ export default function AdminLayout({ children }) {
 
   const navItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/admin/proformas', icon: Receipt, label: 'Proformas' },
     { path: '/admin/products', icon: Package, label: 'Productos' },
     { path: '/admin/users', icon: Users, label: 'Usuarios' },
   ];

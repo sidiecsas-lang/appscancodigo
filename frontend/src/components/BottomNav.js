@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Camera, FileText, Settings, LogOut, LayoutDashboard } from 'lucide-react';
+import { Camera, FileText, Receipt, LogOut, LayoutDashboard } from 'lucide-react';
 
 export default function BottomNav() {
   const navigate = useNavigate();
@@ -10,7 +10,8 @@ export default function BottomNav() {
 
   const navItems = [
     { path: '/scanner', icon: Camera, label: 'Escáner' },
-    { path: '/quoter', icon: FileText, label: 'Cotizador' },
+    { path: '/quoter', icon: FileText, label: 'Cotizar' },
+    { path: '/proformas', icon: Receipt, label: 'Proformas' },
     ...(isAdmin ? [{ path: '/admin', icon: LayoutDashboard, label: 'Admin' }] : []),
   ];
 

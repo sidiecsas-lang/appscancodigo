@@ -120,14 +120,37 @@ class QuoteResponse(BaseModel):
     id: str
     user_id: str
     user_code: str
-    user_name: str = ""  # Nombre completo del empleado
+    user_name: str = ""
     client_name: Optional[str] = None
     client_email: Optional[str] = None
     client_phone: Optional[str] = None
     client_address: Optional[str] = None
     items: List[QuoteItemResponse]
     total_amount: float
+    balance_paid: float = 0.0
+    balance_pending: float = 0.0
+    status: str = "pendiente"  # pendiente, parcial, pagado
+    due_date: Optional[str] = None
+    is_overdue: bool = False
     created_at: str
+
+class PaymentCreate(BaseModel):
+    amount: float
+    payment_type: str = "abono"  # abono, total
+
+class PaymentResponse(BaseModel):
+    id: str
+    quote_id: str
+    amount: float
+    payment_type: str
+    created_at: str
+    created_by: str
+
+class SettingsResponse(BaseModel):
+    days_until_due: int = 30
+
+class SettingsUpdate(BaseModel):
+    days_until_due: int
 
 class ScanLogCreate(BaseModel):
     product_id: str
@@ -193,6 +216,64 @@ def calculate_price(quantity: int, is_bulk: bool, price_1: float, price_2: float
         return price_2
     else:
         return price_3
+
+async def get_settings():
+    """Get global settings, create default if not exists"""
+    settings = await db.settings.find_one({"id": "global"}, {"_id": 0})
+    if not settings:
+        settings = {"id": "global", "days_until_due": 30}
+        await db.settings.insert_one(settings)
+    return settings
+
+def calculate_quote_status(total_amount: float, balance_paid: float) -> str:
+    """Calculate status based on payments"""
+    if balance_paid >= total_amount:
+        return "pagado"
+    elif balance_paid > 0:
+        return "parcial"
+    return "pendiente"
+
+def is_quote_overdue(created_at: str, days_until_due: int, status: str) -> bool:
+    """Check if quote is overdue"""
+    if status == "pagado":
+        return False
+    try:
+        created = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        due_date = created + timedelta(days=days_until_due)
+        return datetime.now(timezone.utc) > due_date
+    except:
+        return False
+
+def get_due_date(created_at: str, days_until_due: int) -> str:
+    """Calculate due date from created_at"""
+    try:
+        created = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        due_date = created + timedelta(days=days_until_due)
+        return due_date.isoformat()
+    except:
+        return ""
+
+async def enrich_quote(quote: dict) -> dict:
+    """Add calculated fields to quote"""
+    settings = await get_settings()
+    days = settings.get("days_until_due", 30)
+    
+    quote.setdefault("balance_paid", 0.0)
+    quote.setdefault("status", "pendiente")
+    quote.setdefault("user_name", "")
+    quote.setdefault("client_email", None)
+    quote.setdefault("client_phone", None)
+    quote.setdefault("client_address", None)
+    
+    total = quote.get("total_amount", 0)
+    paid = quote.get("balance_paid", 0)
+    
+    quote["balance_pending"] = max(0, total - paid)
+    quote["status"] = calculate_quote_status(total, paid)
+    quote["due_date"] = get_due_date(quote.get("created_at", ""), days)
+    quote["is_overdue"] = is_quote_overdue(quote.get("created_at", ""), days, quote["status"])
+    
+    return quote
 
 # ============ AUTH ROUTES ============
 
@@ -470,24 +551,33 @@ async def create_quote(quote_data: QuoteCreate, user: dict = Depends(get_current
         "client_address": quote_data.client_address,
         "items": items,
         "total_amount": total,
+        "balance_paid": 0.0,
+        "status": "pendiente",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.quotes.insert_one(quote_doc)
-    return QuoteResponse(**{k: v for k, v in quote_doc.items() if k != "_id"})
+    enriched = await enrich_quote({k: v for k, v in quote_doc.items() if k != "_id"})
+    return QuoteResponse(**enriched)
 
 @api_router.get("/quotes", response_model=List[QuoteResponse])
-async def get_quotes(user: dict = Depends(get_current_user)):
+async def get_quotes(
+    user: dict = Depends(get_current_user),
+    status: Optional[str] = None,
+    overdue_only: bool = False
+):
     query = {} if user["role"] == "admin" else {"user_id": user["id"]}
-    quotes = await db.quotes.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
-    # Add default values for missing fields
+    if status:
+        query["status"] = status
+    
+    quotes = await db.quotes.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    
     result = []
     for q in quotes:
-        q.setdefault("user_name", "")
-        q.setdefault("client_email", None)
-        q.setdefault("client_phone", None)
-        q.setdefault("client_address", None)
-        result.append(QuoteResponse(**q))
+        enriched = await enrich_quote(q)
+        if overdue_only and not enriched["is_overdue"]:
+            continue
+        result.append(QuoteResponse(**enriched))
     return result
 
 @api_router.get("/quotes/{quote_id}", response_model=QuoteResponse)
@@ -499,11 +589,92 @@ async def get_quote(quote_id: str, user: dict = Depends(get_current_user)):
     quote = await db.quotes.find_one(query, {"_id": 0})
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
-    quote.setdefault("user_name", "")
-    quote.setdefault("client_email", None)
-    quote.setdefault("client_phone", None)
-    quote.setdefault("client_address", None)
-    return QuoteResponse(**quote)
+    
+    enriched = await enrich_quote(quote)
+    return QuoteResponse(**enriched)
+
+# ============ PAYMENT ROUTES ============
+
+@api_router.post("/quotes/{quote_id}/payments", response_model=QuoteResponse)
+async def register_payment(quote_id: str, payment: PaymentCreate, user: dict = Depends(get_current_user)):
+    query = {"id": quote_id}
+    if user["role"] != "admin":
+        query["user_id"] = user["id"]
+    
+    quote = await db.quotes.find_one(query, {"_id": 0})
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    
+    total = quote.get("total_amount", 0)
+    current_paid = quote.get("balance_paid", 0)
+    pending = total - current_paid
+    
+    if pending <= 0:
+        raise HTTPException(status_code=400, detail="Quote is already fully paid")
+    
+    # Calculate payment amount
+    if payment.payment_type == "total":
+        amount = pending  # Pay remaining balance
+    else:
+        amount = min(payment.amount, pending)  # Don't overpay
+    
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Invalid payment amount")
+    
+    new_paid = current_paid + amount
+    new_status = calculate_quote_status(total, new_paid)
+    
+    # Update quote
+    await db.quotes.update_one(
+        {"id": quote_id},
+        {"$set": {"balance_paid": new_paid, "status": new_status}}
+    )
+    
+    # Log payment
+    payment_doc = {
+        "id": str(uuid.uuid4()),
+        "quote_id": quote_id,
+        "amount": amount,
+        "payment_type": payment.payment_type,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["id"]
+    }
+    await db.payments.insert_one(payment_doc)
+    
+    # Return updated quote
+    updated_quote = await db.quotes.find_one({"id": quote_id}, {"_id": 0})
+    enriched = await enrich_quote(updated_quote)
+    return QuoteResponse(**enriched)
+
+@api_router.get("/quotes/{quote_id}/payments")
+async def get_quote_payments(quote_id: str, user: dict = Depends(get_current_user)):
+    query = {"id": quote_id}
+    if user["role"] != "admin":
+        query["user_id"] = user["id"]
+    
+    quote = await db.quotes.find_one(query)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    
+    payments = await db.payments.find({"quote_id": quote_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return payments
+
+# ============ SETTINGS ROUTES ============
+
+@api_router.get("/settings", response_model=SettingsResponse)
+async def get_app_settings(user: dict = Depends(get_current_user)):
+    settings = await get_settings()
+    return SettingsResponse(**settings)
+
+@api_router.put("/settings", response_model=SettingsResponse)
+async def update_settings(settings_data: SettingsUpdate, admin: dict = Depends(get_admin_user)):
+    await db.settings.update_one(
+        {"id": "global"},
+        {"$set": {"days_until_due": settings_data.days_until_due}},
+        upsert=True
+    )
+    settings = await get_settings()
+    return SettingsResponse(**settings)
 
 # ============ SCAN LOG ROUTES ============
 
@@ -592,11 +763,38 @@ async def get_metrics_summary(admin: dict = Depends(get_admin_user)):
     total_quotes = await db.quotes.count_documents({})
     total_scans = await db.scan_logs.count_documents({})
     
+    # Calculate proforma stats
+    settings = await get_settings()
+    days = settings.get("days_until_due", 30)
+    
+    all_quotes = await db.quotes.find({}, {"_id": 0}).to_list(1000)
+    
+    overdue_count = 0
+    overdue_amount = 0.0
+    pending_amount = 0.0
+    paid_count = 0
+    
+    for q in all_quotes:
+        enriched = await enrich_quote(q)
+        pending = enriched.get("balance_pending", 0)
+        
+        if enriched.get("status") == "pagado":
+            paid_count += 1
+        else:
+            pending_amount += pending
+            if enriched.get("is_overdue"):
+                overdue_count += 1
+                overdue_amount += pending
+    
     return {
         "total_products": total_products,
         "total_users": total_users,
         "total_quotes": total_quotes,
-        "total_scans": total_scans
+        "total_scans": total_scans,
+        "overdue_quotes": overdue_count,
+        "overdue_amount": overdue_amount,
+        "total_pending_amount": pending_amount,
+        "paid_quotes": paid_count
     }
 
 # ============ INIT ADMIN USER ============

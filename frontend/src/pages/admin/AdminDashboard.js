@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_URL, getToken, formatCurrency, LOGO_URL } from '../../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { Package, Users, FileText, BarChart3, TrendingUp, Award } from 'lucide-react';
+import { Package, Users, FileText, BarChart3, TrendingUp, Award, AlertTriangle, DollarSign } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
 import AdminLayout from '../../components/AdminLayout';
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
       color: 'bg-green-50 text-green-600'
     },
     { 
-      label: 'Cotizaciones', 
+      label: 'Proformas', 
       value: summary?.total_quotes || 0, 
       icon: FileText,
       color: 'bg-purple-50 text-purple-600'
@@ -65,6 +65,39 @@ export default function AdminDashboard() {
       value: summary?.total_scans || 0, 
       icon: BarChart3,
       color: 'bg-[#D4A5A5]/10 text-[#D4A5A5]'
+    }
+  ];
+
+  const proformaCards = [
+    { 
+      label: 'Proformas Vencidas', 
+      value: summary?.overdue_quotes || 0, 
+      icon: AlertTriangle,
+      color: 'text-red-600',
+      bgColor: 'bg-red-50 border-l-4 border-l-red-500'
+    },
+    { 
+      label: 'Monto Vencido', 
+      value: formatCurrency(summary?.overdue_amount || 0), 
+      icon: AlertTriangle,
+      color: 'text-red-600',
+      bgColor: 'bg-red-50 border-l-4 border-l-red-500',
+      isAmount: true
+    },
+    { 
+      label: 'Cartera Pendiente', 
+      value: formatCurrency(summary?.total_pending_amount || 0), 
+      icon: DollarSign,
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-50 border-l-4 border-l-yellow-500',
+      isAmount: true
+    },
+    { 
+      label: 'Proformas Pagadas', 
+      value: summary?.paid_quotes || 0, 
+      icon: FileText,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50 border-l-4 border-l-green-500'
     }
   ];
 
@@ -96,6 +129,28 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Proforma Stats */}
+        <div>
+          <h2 className="text-lg font-medium text-[#1A1A1A] mb-3">Estado de Cobranzas</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="proforma-cards">
+            {proformaCards.map((card) => (
+              <Card key={card.label} className={`border-0 shadow-sm ${card.bgColor}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wider">{card.label}</p>
+                      <p className={`text-xl font-bold mt-1 ${card.color}`}>
+                        {loading ? '...' : (card.isAmount ? card.value : card.value.toLocaleString())}
+                      </p>
+                    </div>
+                    <card.icon size={20} className={card.color} />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
 
         {/* Top Scanned Products Chart */}

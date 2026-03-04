@@ -8,9 +8,11 @@ import { Toaster } from "./components/ui/sonner";
 import LoginPage from "./pages/LoginPage";
 import ScannerPage from "./pages/ScannerPage";
 import QuoterPage from "./pages/QuoterPage";
+import ProformasPage from "./pages/ProformasPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminProformas from "./pages/admin/AdminProformas";
 
 // Protected Route Component
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -119,6 +121,11 @@ function AppRoutes() {
             <QuoterPage />
           </ProtectedRoute>
         } />
+        <Route path="/proformas" element={
+          <ProtectedRoute>
+            <ProformasPage />
+          </ProtectedRoute>
+        } />
         
         {/* Admin Routes */}
         <Route path="/admin" element={
@@ -134,6 +141,11 @@ function AppRoutes() {
         <Route path="/admin/users" element={
           <ProtectedRoute adminOnly>
             <AdminUsers />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/proformas" element={
+          <ProtectedRoute adminOnly>
+            <AdminProformas />
           </ProtectedRoute>
         } />
         
