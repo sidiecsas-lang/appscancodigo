@@ -564,9 +564,28 @@ export default function QuoterPage() {
                         >
                           <Minus size={14} />
                         </Button>
-                        <span className="w-8 text-center font-medium" data-testid={`quantity-${item.product.id}`}>
-                          {item.quantity}
-                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val) && val >= 1) {
+                              updateQuantity(item.product.id, val);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (isNaN(val) || val < 1) {
+                              updateQuantity(item.product.id, 1);
+                            }
+                          }}
+                          className="quoter-qty-input h-8 w-[60px] text-center font-medium text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#D4A5A5]"
+                          data-testid={`quantity-${item.product.id}`}
+                        />
                         <Button
                           size="sm"
                           variant="outline"
@@ -662,6 +681,17 @@ export default function QuoterPage() {
       </main>
 
       <BottomNav />
+
+      <style>{`
+        .quoter-qty-input::-webkit-inner-spin-button,
+        .quoter-qty-input::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .quoter-qty-input {
+          -moz-appearance: textfield;
+        }
+      `}</style>
     </div>
   );
 }
