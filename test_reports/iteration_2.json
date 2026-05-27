@@ -1,0 +1,85 @@
+{
+  "summary": "Full backend + frontend testing of 4 cambios: CAMBIO 1 (new client_id_number/city fields), CAMBIO 3 (edit proforma PUT endpoint + UI), CAMBIO 4 (price_1 only + manual price), and backward compat. All 15 backend pytest tests and all 15 frontend Playwright checks passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cambios_iteration2.py",
+    "/app/test_reports/pytest/pytest_cambios_iteration2.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "openEditDialog() sets product_price_1 from item.unit_price_applied (snapshot at creation time) not current DB price_1 — acceptable since PUT endpoint always re-fetches current price_1, but display in edit modal may show stale price. Low priority.",
+    "No DELETE /api/quotes endpoint — test quotes created during backend testing cannot be cleaned up. Minor, doesn't affect functionality."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_cambios_iteration2.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15)",
+    "frontend": "100% (15/15)"
+  },
+  "test_credentials": {
+    "admin": "user_code=admin, password=admin123",
+    "empleado": "user_code=empleado1, password=emp123"
+  },
+  "seed_data_creation": "Backend tests created several TEST_ quotes (created_quote_id fixture, test_edit_quote_returns_400_if_pagado, test_create_quote_with_*, etc.). These cannot be cleaned up as there is no DELETE /api/quotes endpoint.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 4 cambios fully implemented and tested. Credentials: admin/admin123, empleado1/emp123. QuoterPage has Cedula/RUC (data-testid=client-id-number-input) and Ciudad (data-testid=client-city-input) fields. ProformasPage detail shows these fields when set. Edit dialog (data-testid=edit-proforma-button, save-edit-button, download-updated-pdf-button) all working. No Bulto toggle in quoter items. Pencil (data-testid=edit-price-*) + Precio especial badge working. ScannerPage modal shows only Precio 1 (data-testid=product-price-1). Backend PUT /api/quotes/{id}/items returns 400 for paid proformas. Backward compat: scan endpoint returns price_1, price_2, price_3.",
+  "detailed_test_results": {
+    "CAMBIO_1_backend": [
+      "PASS: POST /api/quotes accepts client_id_number (cedula 10-digit) and client_city",
+      "PASS: POST /api/quotes accepts client_id_number (RUC 13-digit)",
+      "PASS: POST /api/quotes without new fields still works (backward compat, returns null for new fields)",
+      "PASS: GET /api/quotes/{id} returns client_id_number and client_city"
+    ],
+    "CAMBIO_1_frontend": [
+      "PASS: QuoterPage - Cedula/RUC field (data-testid=client-id-number-input) visible",
+      "PASS: QuoterPage - Ciudad field (data-testid=client-city-input) visible",
+      "PASS: QuoterPage - RUC and Ciudad labels shown",
+      "PASS: ProformasPage - Detail shows client_id_number (9876543210) with Cedula/RUC label",
+      "PASS: ProformasPage - Detail shows client_city (Cuenca) with MapPin icon"
+    ],
+    "CAMBIO_3_backend": [
+      "PASS: PUT /api/quotes/{id}/items returns 200 and updates items",
+      "PASS: PUT recalculates total_amount correctly (price_1 * qty)",
+      "PASS: PUT returns 400 with 'pagada' detail when status = pagado",
+      "PASS: PUT updates all client fields (name, email, phone, city, id_number)"
+    ],
+    "CAMBIO_3_frontend": [
+      "PASS: Editar Proforma button visible on non-paid proformas",
+      "PASS: Editar Proforma button NOT visible on paid proformas",
+      "PASS: Edit modal has edit-client-name, edit-client-id-number, edit-client-city, edit-product-search fields",
+      "PASS: Edit modal shows existing items (2 items shown)",
+      "PASS: Edit product search returns results",
+      "PASS: Guardar Cambios calls PUT endpoint (success toast 'Proforma actualizada exitosamente')",
+      "PASS: Descargar PDF Actualizado button appears after save"
+    ],
+    "CAMBIO_4_backend": [
+      "PASS: POST /api/quotes uses price_1 by default (price_was_manual=False)",
+      "PASS: POST /api/quotes with manual_price uses that price (price_was_manual=True)",
+      "PASS: qty >= 12 still uses price_1 (old price_2 logic removed)"
+    ],
+    "CAMBIO_4_frontend": [
+      "PASS: QuoterPage - No Bulto toggle in quoter items",
+      "PASS: QuoterPage - Pencil (edit-price-{id}) button found",
+      "PASS: QuoterPage - Price input (price-input-{id}) appears after clicking pencil",
+      "PASS: QuoterPage - 'Precio especial' badge appears after setting custom price",
+      "PASS: ScannerPage - Product modal shows only 'Precio 1' (no Precio 2, no Precio 3)"
+    ],
+    "backward_compat": [
+      "PASS: GET /api/products/scan/{code} returns price_1, price_2, price_3",
+      "PASS: GET /api/products returns price_1, price_2, price_3 for all products",
+      "PASS: Login admin/admin123 works",
+      "PASS: Login empleado1/emp123 works"
+    ]
+  },
+  "rca_of_issue": "No bugs found. All 4 cambios are correctly implemented and functioning as expected. The download-updated-pdf-button correctly uses the updated selectedProforma state (set via setSelectedProforma(response.data) on save)."
+}

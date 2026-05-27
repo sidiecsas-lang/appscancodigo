@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL, getToken, formatCurrency, calculatePrice, getPriceLabel, LOGO_URL, getUser } from '../lib/utils';
+import { API_URL, getToken, formatCurrency, LOGO_URL, getUser } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Switch } from '../components/ui/switch';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { ScrollArea } from '../components/ui/scroll-area';
-import { Search, Plus, Minus, Trash2, FileText, Share2, Package, ShoppingCart } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, FileText, Share2, Package, ShoppingCart, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import jsPDF from 'jspdf';
@@ -24,9 +23,12 @@ export default function QuoterPage() {
   const [clientEmail, setClientEmail] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientAddress, setClientAddress] = useState('');
+  const [clientIdNumber, setClientIdNumber] = useState('');
+  const [clientCity, setClientCity] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [editingPriceId, setEditingPriceId] = useState(null);
 
   // Search products
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function QuoterPage() {
           setQuoteItems(prev => [...prev, {
             product,
             quantity: 1,
-            isBulk: false
+            manualPrice: null
           }]);
           toast.success('Producto agregado desde escáner');
         }
@@ -93,7 +95,7 @@ export default function QuoterPage() {
       setQuoteItems([...quoteItems, {
         product,
         quantity: 1,
-        isBulk: false
+        manualPrice: null
       }]);
     }
     setSearchTerm('');
@@ -112,11 +114,11 @@ export default function QuoterPage() {
     ));
   };
 
-  // Toggle bulk
-  const toggleBulk = (productId) => {
-    setQuoteItems(quoteItems.map(item => 
-      item.product.id === productId 
-        ? { ...item, isBulk: !item.isBulk }
+  // Update manual price
+  const updateManualPrice = (productId, price) => {
+    setQuoteItems(quoteItems.map(item =>
+      item.product.id === productId
+        ? { ...item, manualPrice: price }
         : item
     ));
   };
@@ -129,7 +131,7 @@ export default function QuoterPage() {
 
   // Calculate totals
   const calculateSubtotal = (item) => {
-    const unitPrice = calculatePrice(item.quantity, item.isBulk, item.product.price_1, item.product.price_2, item.product.price_3);
+    const unitPrice = item.manualPrice && item.manualPrice > 0 ? item.manualPrice : item.product.price_1;
     return unitPrice * item.quantity;
   };
 
@@ -144,7 +146,6 @@ export default function QuoterPage() {
     doc.setFillColor(26, 26, 26);
     doc.rect(0, 0, 210, 35, 'F');
     
-    // Logo placeholder text
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
@@ -173,7 +174,7 @@ export default function QuoterPage() {
     doc.text(`Fecha: ${date}`, 14, yPos);
     yPos += 6;
     
-    // Vendedor info - show name if available
+    // Vendedor info
     const vendorName = user?.name || user?.user_code || 'N/A';
     doc.text(`Vendedor: ${vendorName}`, 14, yPos);
     yPos += 6;
@@ -181,6 +182,14 @@ export default function QuoterPage() {
     // Client info
     if (clientName) {
       doc.text(`Cliente: ${clientName}`, 14, yPos);
+      yPos += 6;
+    }
+    if (clientIdNumber) {
+      doc.text(`Cédula/RUC: ${clientIdNumber}`, 14, yPos);
+      yPos += 6;
+    }
+    if (clientCity) {
+      doc.text(`Ciudad: ${clientCity}`, 14, yPos);
       yPos += 6;
     }
     if (clientPhone) {
@@ -198,16 +207,19 @@ export default function QuoterPage() {
     
     // Table
     const tableData = quoteItems.map(item => {
-      const unitPrice = calculatePrice(item.quantity, item.isBulk, item.product.price_1, item.product.price_2, item.product.price_3);
+      const unitPrice = item.manualPrice && item.manualPrice > 0 ? item.manualPrice : item.product.price_1;
+      const isPriceManual = item.manualPrice && item.manualPrice > 0;
       return [
         item.product.internal_code,
         item.product.name.substring(0, 40),
         item.quantity,
-        item.isBulk ? 'Bulto' : (item.quantity >= 12 ? 'Mayor' : 'Unidad'),
+        isPriceManual ? 'Especial' : 'Precio 1',
         formatCurrency(unitPrice),
         formatCurrency(unitPrice * item.quantity)
       ];
     });
+    
+    const hasManualPrices = quoteItems.some(i => i.manualPrice && i.manualPrice > 0);
     
     autoTable(doc, {
       startY: yPos + 6,
@@ -245,6 +257,14 @@ export default function QuoterPage() {
     doc.setFont('helvetica', 'bold');
     doc.text(`TOTAL: ${formatCurrency(total)}`, 158, finalY + 8, { align: 'center' });
     
+    // Note for manual prices
+    if (hasManualPrices) {
+      doc.setTextColor(180, 120, 0);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text('(*) Tipo "Especial": precio acordado con el cliente, diferente al precio de catálogo.', 14, finalY + 20);
+    }
+    
     // Footer
     doc.setTextColor(150, 150, 150);
     doc.setFontSize(8);
@@ -270,10 +290,13 @@ export default function QuoterPage() {
         client_email: clientEmail || null,
         client_phone: clientPhone || null,
         client_address: clientAddress || null,
+        client_id_number: clientIdNumber || null,
+        client_city: clientCity || null,
         items: quoteItems.map(item => ({
           product_id: item.product.id,
           quantity: item.quantity,
-          is_bulk: item.isBulk
+          is_bulk: false,
+          manual_price: item.manualPrice || null
         }))
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -356,6 +379,26 @@ export default function QuoterPage() {
                 data-testid="client-name-input"
               />
             </div>
+            <div>
+              <Label htmlFor="clientIdNumber" className="text-sm font-medium text-gray-700">
+                Cédula / RUC
+              </Label>
+              <Input
+                id="clientIdNumber"
+                value={clientIdNumber}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  setClientIdNumber(v);
+                }}
+                placeholder="1234567890 (10 o 13 dígitos)"
+                maxLength={13}
+                className="mt-1 bg-gray-50/50"
+                data-testid="client-id-number-input"
+              />
+              {clientIdNumber && clientIdNumber.length !== 10 && clientIdNumber.length !== 13 && (
+                <p className="text-xs text-amber-600 mt-1">Debe tener 10 o 13 dígitos</p>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="clientPhone" className="text-sm font-medium text-gray-700">
@@ -385,18 +428,33 @@ export default function QuoterPage() {
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="clientAddress" className="text-sm font-medium text-gray-700">
-                Dirección
-              </Label>
-              <Input
-                id="clientAddress"
-                value={clientAddress}
-                onChange={(e) => setClientAddress(e.target.value)}
-                placeholder="Dirección del cliente"
-                className="mt-1 bg-gray-50/50"
-                data-testid="client-address-input"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="clientCity" className="text-sm font-medium text-gray-700">
+                  Ciudad
+                </Label>
+                <Input
+                  id="clientCity"
+                  value={clientCity}
+                  onChange={(e) => setClientCity(e.target.value)}
+                  placeholder="Guayaquil"
+                  className="mt-1 bg-gray-50/50"
+                  data-testid="client-city-input"
+                />
+              </div>
+              <div>
+                <Label htmlFor="clientAddress" className="text-sm font-medium text-gray-700">
+                  Dirección
+                </Label>
+                <Input
+                  id="clientAddress"
+                  value={clientAddress}
+                  onChange={(e) => setClientAddress(e.target.value)}
+                  placeholder="Dirección del cliente"
+                  className="mt-1 bg-gray-50/50"
+                  data-testid="client-address-input"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -467,9 +525,10 @@ export default function QuoterPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {quoteItems.map((item, index) => {
-                  const unitPrice = calculatePrice(item.quantity, item.isBulk, item.product.price_1, item.product.price_2, item.product.price_3);
+                {quoteItems.map((item) => {
+                  const unitPrice = item.manualPrice && item.manualPrice > 0 ? item.manualPrice : item.product.price_1;
                   const subtotal = unitPrice * item.quantity;
+                  const isPriceManual = item.manualPrice && item.manualPrice > 0;
                   
                   return (
                     <div 
@@ -494,52 +553,76 @@ export default function QuoterPage() {
                         </button>
                       </div>
                       
-                      {/* Quantity & Bulk */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 w-8 p-0"
-                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                            data-testid={`decrease-qty-${item.product.id}`}
-                          >
-                            <Minus size={14} />
-                          </Button>
-                          <span className="w-8 text-center font-medium" data-testid={`quantity-${item.product.id}`}>
-                            {item.quantity}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 w-8 p-0"
-                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                            data-testid={`increase-qty-${item.product.id}`}
-                          >
-                            <Plus size={14} />
-                          </Button>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor={`bulk-${item.product.id}`} className="text-xs text-gray-500">
-                            Bulto
-                          </Label>
-                          <Switch
-                            id={`bulk-${item.product.id}`}
-                            checked={item.isBulk}
-                            onCheckedChange={() => toggleBulk(item.product.id)}
-                            data-testid={`bulk-switch-${item.product.id}`}
-                          />
-                        </div>
+                      {/* Quantity controls */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                          data-testid={`decrease-qty-${item.product.id}`}
+                        >
+                          <Minus size={14} />
+                        </Button>
+                        <span className="w-8 text-center font-medium" data-testid={`quantity-${item.product.id}`}>
+                          {item.quantity}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                          data-testid={`increase-qty-${item.product.id}`}
+                        >
+                          <Plus size={14} />
+                        </Button>
                       </div>
                       
                       {/* Price Info */}
                       <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-                        <div className="text-xs text-gray-500">
-                          {formatCurrency(unitPrice)} x {item.quantity}
-                          <Badge variant="outline" className="ml-2 text-[10px]">
-                            {getPriceLabel(item.quantity, item.isBulk)}
-                          </Badge>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {editingPriceId === item.product.id ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              defaultValue={unitPrice}
+                              className="h-7 w-24 text-sm"
+                              autoFocus
+                              onBlur={(e) => {
+                                const val = parseFloat(e.target.value);
+                                updateManualPrice(item.product.id, (!isNaN(val) && val > 0) ? val : null);
+                                setEditingPriceId(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.target.blur();
+                                if (e.key === 'Escape') {
+                                  updateManualPrice(item.product.id, null);
+                                  setEditingPriceId(null);
+                                }
+                              }}
+                              data-testid={`price-input-${item.product.id}`}
+                            />
+                          ) : (
+                            <>
+                              <span className="text-xs text-gray-500">
+                                {formatCurrency(unitPrice)} x {item.quantity}
+                              </span>
+                              {isPriceManual && (
+                                <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300 bg-amber-50">
+                                  Precio especial
+                                </Badge>
+                              )}
+                              <button
+                                onClick={() => setEditingPriceId(item.product.id)}
+                                className="p-1 text-gray-400 hover:text-[#D4A5A5] transition-colors"
+                                title="Editar precio"
+                                data-testid={`edit-price-${item.product.id}`}
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            </>
+                          )}
                         </div>
                         <span className="font-medium text-[#1A1A1A]" data-testid={`subtotal-${item.product.id}`}>
                           {formatCurrency(subtotal)}

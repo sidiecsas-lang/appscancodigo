@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL, getToken, formatCurrency, formatDate, LOGO_URL } from '../lib/utils';
+import { API_URL, getToken, formatCurrency, formatDate, LOGO_URL, getUser } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { FileText, Clock, CheckCircle, AlertTriangle, DollarSign, CreditCard, ChevronRight, User, Phone, Mail, MapPin } from 'lucide-react';
+import { FileText, Clock, CheckCircle, AlertTriangle, DollarSign, CreditCard, ChevronRight, User, Phone, Mail, MapPin, Search, Pencil, Minus, Plus, Trash2, Edit, Download, CreditCard as IdCard } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import BottomNav from '../components/BottomNav';
 
 export default function ProformasPage() {
@@ -20,6 +23,21 @@ export default function ProformasPage() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [filter, setFilter] = useState('all');
+
+  // Edit state
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editClientName, setEditClientName] = useState('');
+  const [editClientIdNumber, setEditClientIdNumber] = useState('');
+  const [editClientCity, setEditClientCity] = useState('');
+  const [editClientPhone, setEditClientPhone] = useState('');
+  const [editClientEmail, setEditClientEmail] = useState('');
+  const [editClientAddress, setEditClientAddress] = useState('');
+  const [editItems, setEditItems] = useState([]);
+  const [editSearchTerm, setEditSearchTerm] = useState('');
+  const [editSearchResults, setEditSearchResults] = useState([]);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editingPriceId, setEditingPriceId] = useState(null);
+  const [editSaved, setEditSaved] = useState(false);
 
   const fetchProformas = async () => {
     try {
@@ -38,6 +56,181 @@ export default function ProformasPage() {
   useEffect(() => {
     fetchProformas();
   }, []);
+
+  // Product search for edit modal
+  useEffect(() => {
+    if (editSearchTerm.length < 2) { setEditSearchResults([]); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const token = getToken();
+        const res = await axios.get(`${API_URL}/products`, {
+          params: { search: editSearchTerm },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setEditSearchResults(res.data.slice(0, 10));
+      } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [editSearchTerm]);
+
+  const openEditDialog = (proforma) => {
+    setEditClientName(proforma.client_name || '');
+    setEditClientIdNumber(proforma.client_id_number || '');
+    setEditClientCity(proforma.client_city || '');
+    setEditClientPhone(proforma.client_phone || '');
+    setEditClientEmail(proforma.client_email || '');
+    setEditClientAddress(proforma.client_address || '');
+    setEditItems(proforma.items.map(item => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      product_code: item.product_code,
+      product_price_1: item.unit_price_applied,
+      quantity: item.quantity,
+      manualPrice: item.price_was_manual ? item.unit_price_applied : null
+    })));
+    setEditSaved(false);
+    setEditSearchTerm('');
+    setEditSearchResults([]);
+    setShowEditDialog(true);
+  };
+
+  const addEditItem = (product) => {
+    const existing = editItems.find(i => i.product_id === product.id);
+    if (existing) {
+      setEditItems(prev => prev.map(i => i.product_id === product.id ? { ...i, quantity: i.quantity + 1 } : i));
+    } else {
+      setEditItems(prev => [...prev, {
+        product_id: product.id,
+        product_name: product.name,
+        product_code: product.internal_code,
+        product_price_1: product.price_1,
+        quantity: 1,
+        manualPrice: null
+      }]);
+    }
+    setEditSearchTerm('');
+    setEditSearchResults([]);
+    toast.success('Producto agregado');
+  };
+
+  const updateEditQuantity = (productId, qty) => {
+    if (qty < 1) return;
+    setEditItems(prev => prev.map(i => i.product_id === productId ? { ...i, quantity: qty } : i));
+  };
+
+  const removeEditItem = (productId) => {
+    setEditItems(prev => prev.filter(i => i.product_id !== productId));
+  };
+
+  const updateEditManualPrice = (productId, price) => {
+    setEditItems(prev => prev.map(i => i.product_id === productId ? { ...i, manualPrice: price } : i));
+  };
+
+  const editTotal = editItems.reduce((sum, i) => {
+    const p = i.manualPrice && i.manualPrice > 0 ? i.manualPrice : i.product_price_1;
+    return sum + p * i.quantity;
+  }, 0);
+
+  const handleSaveEdit = async () => {
+    if (editItems.length === 0) { toast.error('Agregue al menos un producto'); return; }
+    setEditLoading(true);
+    try {
+      const token = getToken();
+      const response = await axios.put(
+        `${API_URL}/quotes/${selectedProforma.id}/items`,
+        {
+          client_name: editClientName || null,
+          client_email: editClientEmail || null,
+          client_phone: editClientPhone || null,
+          client_address: editClientAddress || null,
+          client_id_number: editClientIdNumber || null,
+          client_city: editClientCity || null,
+          items: editItems.map(i => ({
+            product_id: i.product_id,
+            quantity: i.quantity,
+            is_bulk: false,
+            manual_price: i.manualPrice || null
+          }))
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSelectedProforma(response.data);
+      setEditSaved(true);
+      toast.success('Proforma actualizada exitosamente');
+      fetchProformas();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al guardar cambios');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const generateProformaPDF = (proforma) => {
+    const doc = new jsPDF();
+    doc.setFillColor(26, 26, 26);
+    doc.rect(0, 0, 210, 35, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MANRIQUE IMPORTADORA', 105, 15, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Productos de Belleza', 105, 22, { align: 'center' });
+    doc.setTextColor(26, 26, 26);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('COTIZACIÓN', 105, 50, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const date = new Date(proforma.created_at).toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+    let yPos = 60;
+    doc.text(`Fecha: ${date}`, 14, yPos); yPos += 6;
+    const vendorName = proforma.user_name || proforma.user_code || 'N/A';
+    doc.text(`Vendedor: ${vendorName}`, 14, yPos); yPos += 6;
+    if (proforma.client_name) { doc.text(`Cliente: ${proforma.client_name}`, 14, yPos); yPos += 6; }
+    if (proforma.client_id_number) { doc.text(`Cédula/RUC: ${proforma.client_id_number}`, 14, yPos); yPos += 6; }
+    if (proforma.client_city) { doc.text(`Ciudad: ${proforma.client_city}`, 14, yPos); yPos += 6; }
+    if (proforma.client_phone) { doc.text(`Teléfono: ${proforma.client_phone}`, 14, yPos); yPos += 6; }
+    if (proforma.client_email) { doc.text(`Email: ${proforma.client_email}`, 14, yPos); yPos += 6; }
+    if (proforma.client_address) { doc.text(`Dirección: ${proforma.client_address}`, 14, yPos); yPos += 6; }
+    const tableData = proforma.items.map(item => [
+      item.product_code,
+      item.product_name.substring(0, 40),
+      item.quantity,
+      item.price_was_manual ? 'Especial' : 'Precio 1',
+      formatCurrency(item.unit_price_applied),
+      formatCurrency(item.subtotal)
+    ]);
+    const hasManual = proforma.items.some(i => i.price_was_manual);
+    autoTable(doc, {
+      startY: yPos + 6,
+      head: [['Código', 'Producto', 'Cant.', 'Tipo', 'P. Unit.', 'Subtotal']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [212, 165, 165], textColor: [26, 26, 26], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 248, 248] },
+      styles: { fontSize: 9, cellPadding: 4 },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 65 }, 2: { cellWidth: 15, halign: 'center' }, 3: { cellWidth: 20, halign: 'center' }, 4: { cellWidth: 25, halign: 'right' }, 5: { cellWidth: 30, halign: 'right' } }
+    });
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFillColor(26, 26, 26);
+    doc.rect(120, finalY, 76, 12, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`TOTAL: ${formatCurrency(proforma.total_amount)}`, 158, finalY + 8, { align: 'center' });
+    if (hasManual) {
+      doc.setTextColor(180, 120, 0);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text('(*) Tipo "Especial": precio acordado con el cliente.', 14, finalY + 20);
+    }
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Esta cotización es válida por 7 días. Precios sujetos a cambio sin previo aviso.', 105, 280, { align: 'center' });
+    return doc;
+  };
 
   const getStatusBadge = (proforma) => {
     if (proforma.status === 'pagado') {
@@ -246,7 +439,7 @@ export default function ProformasPage() {
                 </div>
 
                 {/* Client Info */}
-                {(selectedProforma.client_name || selectedProforma.client_phone || selectedProforma.client_email) && (
+                {(selectedProforma.client_name || selectedProforma.client_phone || selectedProforma.client_email || selectedProforma.client_id_number || selectedProforma.client_city) && (
                   <Card className="border-0 bg-gray-50">
                     <CardContent className="p-4 space-y-2">
                       <p className="text-xs font-medium text-gray-500 uppercase">Cliente</p>
@@ -254,6 +447,18 @@ export default function ProformasPage() {
                         <div className="flex items-center gap-2 text-sm">
                           <User size={14} className="text-gray-400" />
                           {selectedProforma.client_name}
+                        </div>
+                      )}
+                      {selectedProforma.client_id_number && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <IdCard size={14} className="text-gray-400" />
+                          <span className="text-gray-500 text-xs">Cédula/RUC:</span> {selectedProforma.client_id_number}
+                        </div>
+                      )}
+                      {selectedProforma.client_city && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <MapPin size={14} className="text-gray-400" />
+                          {selectedProforma.client_city}
                         </div>
                       )}
                       {selectedProforma.client_phone && (
@@ -319,26 +524,35 @@ export default function ProformasPage() {
 
           {/* Actions */}
           {selectedProforma && selectedProforma.status !== 'pagado' && (
-            <div className="flex gap-3 pt-4 border-t">
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => { setShowPaymentDialog(true); }}
+                  data-testid="register-payment-button"
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Registrar Abono
+                </Button>
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => handlePayment('total')}
+                  disabled={paymentLoading}
+                  data-testid="pay-total-button"
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Pagar Total
+                </Button>
+              </div>
               <Button
                 variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setShowPaymentDialog(true);
-                }}
-                data-testid="register-payment-button"
+                className="w-full border-[#D4A5A5] text-[#D4A5A5] hover:bg-[#D4A5A5]/10"
+                onClick={() => openEditDialog(selectedProforma)}
+                data-testid="edit-proforma-button"
               >
-                <CreditCard className="mr-2 h-4 w-4" />
-                Registrar Abono
-              </Button>
-              <Button
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => handlePayment('total')}
-                disabled={paymentLoading}
-                data-testid="pay-total-button"
-              >
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Pagar Total
+                <Edit className="mr-2 h-4 w-4" />
+                Editar Proforma
               </Button>
             </div>
           )}
@@ -382,6 +596,194 @@ export default function ProformasPage() {
               {paymentLoading ? 'Procesando...' : 'Registrar Abono'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Proforma Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) setShowEditDialog(false); }}>
+        <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-serif flex items-center gap-2">
+              <Edit size={20} />
+              Editar Proforma
+            </DialogTitle>
+            <DialogDescription>
+              Modifica los datos del cliente y los productos. Los pagos previos no se revertirán.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-4 py-2">
+              {/* Client Data */}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase mb-3">Datos del Cliente</p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm">Nombre</Label>
+                      <Input value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder="Nombre del cliente" className="mt-1" data-testid="edit-client-name" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Cédula / RUC</Label>
+                      <Input
+                        value={editClientIdNumber}
+                        onChange={e => setEditClientIdNumber(e.target.value.replace(/\D/g, ''))}
+                        placeholder="1234567890"
+                        maxLength={13}
+                        className="mt-1"
+                        data-testid="edit-client-id-number"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm">Ciudad</Label>
+                      <Input value={editClientCity} onChange={e => setEditClientCity(e.target.value)} placeholder="Guayaquil" className="mt-1" data-testid="edit-client-city" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Teléfono</Label>
+                      <Input value={editClientPhone} onChange={e => setEditClientPhone(e.target.value)} placeholder="0999999999" className="mt-1" data-testid="edit-client-phone" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm">Correo</Label>
+                      <Input type="email" value={editClientEmail} onChange={e => setEditClientEmail(e.target.value)} placeholder="correo@ejemplo.com" className="mt-1" data-testid="edit-client-email" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Dirección</Label>
+                      <Input value={editClientAddress} onChange={e => setEditClientAddress(e.target.value)} placeholder="Dirección" className="mt-1" data-testid="edit-client-address" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Product Search */}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase mb-2">Agregar Producto</p>
+                <div className="relative">
+                  <Input
+                    value={editSearchTerm}
+                    onChange={e => setEditSearchTerm(e.target.value)}
+                    placeholder="Buscar por nombre o código..."
+                    className="pr-8"
+                    data-testid="edit-product-search"
+                  />
+                  <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  {editSearchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-auto">
+                      {editSearchResults.map(product => (
+                        <button key={product.id} onClick={() => addEditItem(product)} className="w-full p-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors" data-testid={`edit-search-result-${product.id}`}>
+                          <p className="font-medium text-sm text-[#1A1A1A] line-clamp-1">{product.name}</p>
+                          <p className="text-xs text-gray-500">{product.internal_code} · {formatCurrency(product.price_1)}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Edit Items */}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase mb-2">
+                  Productos ({editItems.length}) · Total: {formatCurrency(editTotal)}
+                </p>
+                {editItems.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">No hay productos</p>
+                ) : (
+                  <div className="space-y-2">
+                    {editItems.map((item) => {
+                      const unitPrice = item.manualPrice && item.manualPrice > 0 ? item.manualPrice : item.product_price_1;
+                      const isPriceManual = item.manualPrice && item.manualPrice > 0;
+                      return (
+                        <div key={item.product_id} className="bg-gray-50 rounded-lg p-3" data-testid={`edit-item-${item.product_id}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm line-clamp-1">{item.product_name}</p>
+                              <p className="text-xs text-gray-500">{item.product_code}</p>
+                            </div>
+                            <button onClick={() => removeEditItem(item.product_id)} className="p-1 text-gray-400 hover:text-red-500 ml-2" data-testid={`edit-remove-${item.product_id}`}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => updateEditQuantity(item.product_id, item.quantity - 1)}>
+                                <Minus size={12} />
+                              </Button>
+                              <span className="w-7 text-center text-sm font-medium">{item.quantity}</span>
+                              <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => updateEditQuantity(item.product_id, item.quantity + 1)}>
+                                <Plus size={12} />
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {editingPriceId === item.product_id ? (
+                                <Input
+                                  type="number" step="0.01" min="0.01"
+                                  defaultValue={unitPrice}
+                                  className="h-7 w-24 text-sm"
+                                  autoFocus
+                                  onBlur={e => {
+                                    const val = parseFloat(e.target.value);
+                                    updateEditManualPrice(item.product_id, (!isNaN(val) && val > 0) ? val : null);
+                                    setEditingPriceId(null);
+                                  }}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') e.target.blur();
+                                    if (e.key === 'Escape') { updateEditManualPrice(item.product_id, null); setEditingPriceId(null); }
+                                  }}
+                                  data-testid={`edit-price-input-${item.product_id}`}
+                                />
+                              ) : (
+                                <>
+                                  <span className="text-xs text-gray-500">{formatCurrency(unitPrice)} x {item.quantity}</span>
+                                  {isPriceManual && <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300 bg-amber-50">Especial</Badge>}
+                                  <button onClick={() => setEditingPriceId(item.product_id)} className="p-1 text-gray-400 hover:text-[#D4A5A5]" data-testid={`edit-price-btn-${item.product_id}`}>
+                                    <Pencil size={11} />
+                                  </button>
+                                </>
+                              )}
+                              <span className="font-medium text-sm ml-1">{formatCurrency(unitPrice * item.quantity)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </ScrollArea>
+
+          <div className="pt-4 border-t space-y-3">
+            {editSaved && (
+              <Button
+                variant="outline"
+                className="w-full border-green-500 text-green-600 hover:bg-green-50"
+                onClick={() => {
+                  const doc = generateProformaPDF(selectedProforma);
+                  doc.save(`Proforma_Manrique_${selectedProforma.id.slice(0, 8)}.pdf`);
+                }}
+                data-testid="download-updated-pdf-button"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Descargar PDF Actualizado
+              </Button>
+            )}
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowEditDialog(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-[#D4A5A5] hover:bg-[#C29090] text-[#1A1A1A] font-medium"
+                onClick={handleSaveEdit}
+                disabled={editLoading}
+                data-testid="save-edit-button"
+              >
+                {editLoading ? 'Guardando...' : 'Guardar Cambios'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

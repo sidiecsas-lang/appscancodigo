@@ -392,25 +392,13 @@ export default function ScannerPage() {
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                   <Tag size={14} />
-                  Precios
+                  Precio
                 </h4>
                 <div className="grid gap-2">
                   <div className="flex items-center justify-between bg-[#D4A5A5]/5 p-3 rounded-lg border border-[#D4A5A5]/20">
-                    <span className="text-sm text-gray-600">Precio 1 (Bulto)</span>
+                    <span className="text-sm text-gray-600">Precio 1</span>
                     <Badge variant="outline" className="text-[#D4A5A5] border-[#D4A5A5]" data-testid="product-price-1">
                       {formatCurrency(product.price_1)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                    <span className="text-sm text-gray-600">Precio 2 (Mayor 12+)</span>
-                    <Badge variant="secondary" data-testid="product-price-2">
-                      {formatCurrency(product.price_2)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                    <span className="text-sm text-gray-600">Precio 3 (1-11 uds)</span>
-                    <Badge variant="secondary" data-testid="product-price-3">
-                      {formatCurrency(product.price_3)}
                     </Badge>
                   </div>
                 </div>

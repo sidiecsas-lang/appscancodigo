@@ -98,6 +98,7 @@ class QuoteItemCreate(BaseModel):
     product_id: str
     quantity: int
     is_bulk: bool = False
+    manual_price: Optional[float] = None
 
 class QuoteItemResponse(BaseModel):
     product_id: str
@@ -107,12 +108,16 @@ class QuoteItemResponse(BaseModel):
     is_bulk: bool
     unit_price_applied: float
     subtotal: float
+    manual_price: Optional[float] = None
+    price_was_manual: bool = False
 
 class QuoteCreate(BaseModel):
     client_name: Optional[str] = None
     client_email: Optional[str] = None
     client_phone: Optional[str] = None
     client_address: Optional[str] = None
+    client_id_number: Optional[str] = None
+    client_city: Optional[str] = None
     items: List[QuoteItemCreate]
 
 class QuoteResponse(BaseModel):
@@ -125,6 +130,8 @@ class QuoteResponse(BaseModel):
     client_email: Optional[str] = None
     client_phone: Optional[str] = None
     client_address: Optional[str] = None
+    client_id_number: Optional[str] = None
+    client_city: Optional[str] = None
     items: List[QuoteItemResponse]
     total_amount: float
     balance_paid: float = 0.0
@@ -145,6 +152,15 @@ class PaymentResponse(BaseModel):
     payment_type: str
     created_at: str
     created_by: str
+
+class QuoteEditRequest(BaseModel):
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
+    client_phone: Optional[str] = None
+    client_address: Optional[str] = None
+    client_id_number: Optional[str] = None
+    client_city: Optional[str] = None
+    items: List[QuoteItemCreate]
 
 class SettingsResponse(BaseModel):
     days_until_due: int = 30
@@ -264,6 +280,8 @@ async def enrich_quote(quote: dict) -> dict:
     quote.setdefault("client_email", None)
     quote.setdefault("client_phone", None)
     quote.setdefault("client_address", None)
+    quote.setdefault("client_id_number", None)
+    quote.setdefault("client_city", None)
     
     total = quote.get("total_amount", 0)
     paid = quote.get("balance_paid", 0)
@@ -520,13 +538,12 @@ async def create_quote(quote_data: QuoteCreate, user: dict = Depends(get_current
         if not product:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         
-        unit_price = calculate_price(
-            item.quantity,
-            item.is_bulk,
-            product["price_1"],
-            product["price_2"],
-            product["price_3"]
-        )
+        if item.manual_price and item.manual_price > 0:
+            unit_price = item.manual_price
+            price_was_manual = True
+        else:
+            unit_price = product["price_1"]
+            price_was_manual = False
         subtotal = unit_price * item.quantity
         total += subtotal
         
@@ -537,7 +554,9 @@ async def create_quote(quote_data: QuoteCreate, user: dict = Depends(get_current
             "quantity": item.quantity,
             "is_bulk": item.is_bulk,
             "unit_price_applied": unit_price,
-            "subtotal": subtotal
+            "subtotal": subtotal,
+            "manual_price": item.manual_price if price_was_manual else None,
+            "price_was_manual": price_was_manual
         })
     
     quote_doc = {
@@ -549,6 +568,8 @@ async def create_quote(quote_data: QuoteCreate, user: dict = Depends(get_current
         "client_email": quote_data.client_email,
         "client_phone": quote_data.client_phone,
         "client_address": quote_data.client_address,
+        "client_id_number": quote_data.client_id_number,
+        "client_city": quote_data.client_city,
         "items": items,
         "total_amount": total,
         "balance_paid": 0.0,
@@ -658,6 +679,71 @@ async def get_quote_payments(quote_id: str, user: dict = Depends(get_current_use
     
     payments = await db.payments.find({"quote_id": quote_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return payments
+
+@api_router.put("/quotes/{quote_id}/items", response_model=QuoteResponse)
+async def edit_quote(quote_id: str, edit_data: QuoteEditRequest, user: dict = Depends(get_current_user)):
+    query = {"id": quote_id}
+    if user["role"] != "admin":
+        query["user_id"] = user["id"]
+    
+    quote = await db.quotes.find_one(query, {"_id": 0})
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    
+    if quote.get("status") == "pagado":
+        raise HTTPException(status_code=400, detail="No se puede editar una proforma pagada")
+    
+    items = []
+    total = 0.0
+    
+    for item in edit_data.items:
+        product = await db.products.find_one({"id": item.product_id}, {"_id": 0})
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+        
+        if item.manual_price and item.manual_price > 0:
+            unit_price = item.manual_price
+            price_was_manual = True
+        else:
+            unit_price = product["price_1"]
+            price_was_manual = False
+        
+        subtotal = unit_price * item.quantity
+        total += subtotal
+        
+        items.append({
+            "product_id": item.product_id,
+            "product_name": product["name"],
+            "product_code": product["internal_code"],
+            "quantity": item.quantity,
+            "is_bulk": item.is_bulk,
+            "unit_price_applied": unit_price,
+            "subtotal": subtotal,
+            "manual_price": item.manual_price if price_was_manual else None,
+            "price_was_manual": price_was_manual
+        })
+    
+    balance_paid = quote.get("balance_paid", 0.0)
+    new_status = calculate_quote_status(total, balance_paid)
+    
+    update_dict = {
+        "items": items,
+        "total_amount": total,
+        "status": new_status,
+        "client_name": edit_data.client_name,
+        "client_email": edit_data.client_email,
+        "client_phone": edit_data.client_phone,
+        "client_address": edit_data.client_address,
+        "client_id_number": edit_data.client_id_number,
+        "client_city": edit_data.client_city,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.quotes.update_one({"id": quote_id}, {"$set": update_dict})
+    
+    updated_quote = await db.quotes.find_one({"id": quote_id}, {"_id": 0})
+    enriched = await enrich_quote(updated_quote)
+    return QuoteResponse(**enriched)
 
 # ============ SETTINGS ROUTES ============
 
