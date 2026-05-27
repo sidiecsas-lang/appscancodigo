@@ -29,6 +29,7 @@ export default function QuoterPage() {
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [editingPriceId, setEditingPriceId] = useState(null);
+  const [qtyDisplayValues, setQtyDisplayValues] = useState({});
 
   // Search products
   useEffect(() => {
@@ -570,18 +571,24 @@ export default function QuoterPage() {
                           step="1"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          value={item.quantity}
+                          value={qtyDisplayValues[item.product.id] !== undefined ? qtyDisplayValues[item.product.id] : item.quantity}
                           onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
+                            const raw = e.target.value;
+                            setQtyDisplayValues(prev => ({ ...prev, [item.product.id]: raw }));
+                            const val = parseInt(raw, 10);
                             if (!isNaN(val) && val >= 1) {
                               updateQuantity(item.product.id, val);
                             }
                           }}
+                          onFocus={(e) => e.target.select()}
                           onBlur={(e) => {
                             const val = parseInt(e.target.value, 10);
-                            if (isNaN(val) || val < 1) {
-                              updateQuantity(item.product.id, 1);
-                            }
+                            updateQuantity(item.product.id, (!isNaN(val) && val >= 1) ? val : 1);
+                            setQtyDisplayValues(prev => {
+                              const next = { ...prev };
+                              delete next[item.product.id];
+                              return next;
+                            });
                           }}
                           className="quoter-qty-input h-8 w-[60px] text-center font-medium text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#D4A5A5]"
                           data-testid={`quantity-${item.product.id}`}
