@@ -3,7 +3,7 @@ import requests
 import uuid
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://manrique-beauty.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://beauty-importadora.preview.emergentagent.com').rstrip('/')
 
 created_product_id = None
 

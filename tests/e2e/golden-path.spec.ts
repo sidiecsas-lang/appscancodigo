@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { loginAsAdmin, loginAsEmployee, dismissToasts, getAdminToken } from '../fixtures/helpers';
 
-const BASE_URL = 'https://manrique-beauty.preview.emergentagent.com';
+const BASE_URL = 'https://beauty-importadora.preview.emergentagent.com';
 
 test.describe('Golden Path - Full User Journey', () => {
   
