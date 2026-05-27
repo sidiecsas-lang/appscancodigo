@@ -40,14 +40,36 @@ Crear una PWA instalable en Android/iOS para Manrique Importadora (productos de 
 - [x] 57 productos cargados desde Excel
 - [x] Tests: 28 backend + 35 frontend (100% passing)
 
+## Implementado (27 May 2026)
+- [x] CAMBIO 1: Nuevos campos en proforma: client_id_number (Cédula/RUC) y client_city (Ciudad)
+  - Backend: QuoteCreate, QuoteResponse, QuoteItemResponse actualizados
+  - Frontend: QuoterPage.js con nuevos campos en formulario, ProformasPage.js muestra los campos en detalle
+  - PDF incluye Cédula/RUC y Ciudad del cliente
+- [x] CAMBIO 2: Nombre del vendedor en PDF (ya existía, se mantuvo + se agregaron nuevos campos)
+- [x] CAMBIO 3: Edición de proforma ya generada
+  - Backend: PUT /api/quotes/{quote_id}/items (solo edita si status != 'pagado')
+  - Frontend: Botón 'Editar Proforma' + modal completo con búsqueda de productos y edición de ítems
+  - Botón 'Descargar PDF actualizado' aparece tras guardar
+- [x] CAMBIO 4: Solo Precio 1 + precio manual opcional por ítem
+  - Se eliminó lógica bulto/precio2/precio3 del cotizador
+  - Ícono lápiz para editar precio, badge 'Precio especial' cuando es diferente
+  - ScannerPage modal solo muestra Precio 1
+  - Backend: QuoteItemCreate.manual_price, price_was_manual en items
+
 ## Backlog P0
-- [ ] Modal de producto en escáner con botón "Agregar a cotización"
-- [ ] Historial de cotizaciones del usuario
+- [ ] Historial de cotizaciones del usuario (vista paginada)
 
 ## Backlog P1
-- [ ] Notificaciones push
+- [ ] Landing page pública para instalación de la PWA
+- [ ] Notificaciones push para proformas vencidas
 - [ ] Modo offline completo
 - [ ] Exportar métricas a Excel
+
+## Deuda Técnica
+- [ ] Service Worker: cache names estáticos no coinciden con hashes de CRA en producción (usar workbox)
+- [ ] Íconos PWA: mismo PNG para 192 y 512 (generar resoluciones reales)
+- [ ] Backend monolítico en server.py (separar routes/, models/, services/)
+- [ ] JWT_SECRET con fallback hardcodeado (quitar fallback)
 
 ## Credenciales de Prueba
 - Admin: `admin` / `admin123`
