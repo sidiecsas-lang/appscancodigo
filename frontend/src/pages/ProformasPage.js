@@ -603,7 +603,10 @@ export default function ProformasPage() {
 
       {/* Edit Proforma Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) setShowEditDialog(false); }}>
-        <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-hidden flex flex-col">
+        <DialogContent
+          className="sm:max-w-lg overflow-y-auto"
+          style={{ maxHeight: '90vh', WebkitOverflowScrolling: 'touch' }}
+        >
           <DialogHeader>
             <DialogTitle className="font-serif flex items-center gap-2">
               <Edit size={20} />
@@ -614,8 +617,7 @@ export default function ProformasPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2">
               {/* Client Data */}
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase mb-3">Datos del Cliente</p>
@@ -693,12 +695,8 @@ export default function ProformasPage() {
                 {editItems.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-4">No hay productos</p>
                 ) : (
-                  <div className="relative">
-                    <div
-                      className="edit-items-list space-y-2 overflow-y-auto pr-1"
-                      style={{ maxHeight: '35vh' }}
-                    >
-                      {editItems.map((item) => {
+                  <div className="space-y-2">
+                    {editItems.map((item) => {
                       const unitPrice = item.manualPrice && item.manualPrice > 0 ? item.manualPrice : item.product_price_1;
                       const isPriceManual = item.manualPrice && item.manualPrice > 0;
                       return (
@@ -730,11 +728,13 @@ export default function ProformasPage() {
                                   const val = parseInt(raw, 10);
                                   if (!isNaN(val) && val >= 1) updateEditQuantity(item.product_id, val);
                                 }}
-                                onFocus={(e) => e.target.select()}
+                                onFocus={(e) => { e.stopPropagation(); e.target.select(); }}
                                 onBlur={(e) => {
                                   const val = parseInt(e.target.value, 10);
-                                  updateEditQuantity(item.product_id, (!isNaN(val) && val >= 1) ? val : 1);
+                                  // Clear display state FIRST to prevent re-render re-focusing
                                   setEditQtyDisplayValues(prev => { const n = { ...prev }; delete n[item.product_id]; return n; });
+                                  updateEditQuantity(item.product_id, (!isNaN(val) && val >= 1) ? val : 1);
+                                  e.target.blur();
                                 }}
                                 onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
                                 className="edit-qty-input h-7 w-[52px] text-center text-sm font-medium border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#D4A5A5]"
@@ -777,17 +777,12 @@ export default function ProformasPage() {
                         </div>
                       );
                     })}
-                    </div>
-                    {editItems.length > 2 && (
-                      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent" />
-                    )}
                   </div>
                 )}
               </div>
             </div>
-          </ScrollArea>
 
-          <div className="pt-4 border-t space-y-3">
+          <div className="pt-4 border-t space-y-3 mt-2">
             {editSaved && (
               <Button
                 variant="outline"
