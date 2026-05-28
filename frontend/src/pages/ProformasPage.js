@@ -405,8 +405,12 @@ export default function ProformasPage() {
       {/* Proforma Detail Dialog */}
       <Dialog open={!!selectedProforma && !showPaymentDialog} onOpenChange={() => setSelectedProforma(null)}>
         <DialogContent
-          className="sm:max-w-lg w-full overflow-y-auto overflow-x-hidden"
-          style={{ maxHeight: '90vh', WebkitOverflowScrolling: 'touch' }}
+          className="p-4 sm:p-6 w-full overflow-y-auto overflow-x-hidden"
+          style={{
+            maxWidth: 'min(32rem, calc(100vw - 32px))',
+            maxHeight: '90vh',
+            WebkitOverflowScrolling: 'touch'
+          }}
         >
           <DialogHeader>
             <DialogTitle className="font-serif flex items-center gap-2">
