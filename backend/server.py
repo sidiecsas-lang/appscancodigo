@@ -690,8 +690,15 @@ async def edit_quote(quote_id: str, edit_data: QuoteEditRequest, user: dict = De
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
     
-    if quote.get("status") == "pagado":
+    status = quote.get("status", "pendiente")
+
+    # "pagado" — nadie puede editar
+    if status == "pagado":
         raise HTTPException(status_code=400, detail="No se puede editar una proforma pagada")
+
+    # "parcial" — solo admin puede editar
+    if status == "parcial" and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Solo el administrador puede editar esta proforma")
     
     items = []
     total = 0.0

@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { FileText, Clock, CheckCircle, AlertTriangle, DollarSign, CreditCard, ChevronRight, User, Phone, Mail, MapPin, Search, Pencil, Minus, Plus, Trash2, Edit, Download, CreditCard as IdCard } from 'lucide-react';
+import { FileText, Clock, CheckCircle, AlertTriangle, DollarSign, CreditCard, ChevronRight, User, Phone, Mail, MapPin, Search, Pencil, Minus, Plus, Trash2, Edit, Download, CreditCard as IdCard, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import jsPDF from 'jspdf';
@@ -404,7 +404,10 @@ export default function ProformasPage() {
 
       {/* Proforma Detail Dialog */}
       <Dialog open={!!selectedProforma && !showPaymentDialog} onOpenChange={() => setSelectedProforma(null)}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent
+          className="sm:max-w-lg overflow-y-auto"
+          style={{ maxHeight: '90vh', WebkitOverflowScrolling: 'touch' }}
+        >
           <DialogHeader>
             <DialogTitle className="font-serif flex items-center gap-2">
               <FileText size={20} />
@@ -413,8 +416,7 @@ export default function ProformasPage() {
           </DialogHeader>
 
           {selectedProforma && (
-            <ScrollArea className="flex-1 -mx-6 px-6">
-              <div className="space-y-4 py-2">
+            <div className="space-y-4 py-2">
                 {/* Status Card */}
                 <div className={`p-4 rounded-lg ${
                   selectedProforma.status === 'pagado' ? 'bg-green-50' :
@@ -521,43 +523,61 @@ export default function ProformasPage() {
                   </CardContent>
                 </Card>
               </div>
-            </ScrollArea>
           )}
 
-          {/* Actions */}
-          {selectedProforma && selectedProforma.status !== 'pagado' && (
-            <div className="space-y-3 pt-4 border-t">
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => { setShowPaymentDialog(true); }}
-                  data-testid="register-payment-button"
-                >
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Registrar Abono
-                </Button>
-                <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => handlePayment('total')}
-                  disabled={paymentLoading}
-                  data-testid="pay-total-button"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Pagar Total
-                </Button>
+          {/* Actions — dentro del scroll */}
+          {selectedProforma && (() => {
+            const currentUser = getUser();
+            const role = currentUser?.role;
+            const status = selectedProforma.status;
+            const canEdit = status === 'pendiente' || (status === 'parcial' && role === 'admin');
+            const editDisabledReason = status === 'parcial' && role !== 'admin'
+              ? 'Solo el administrador puede editar proformas con abonos'
+              : null;
+
+            return (
+              <div className="space-y-3 pt-4 border-t mt-2">
+                {status !== 'pagado' && (
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => { setShowPaymentDialog(true); }}
+                      data-testid="register-payment-button"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Registrar Abono
+                    </Button>
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => handlePayment('total')}
+                      disabled={paymentLoading}
+                      data-testid="pay-total-button"
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Pagar Total
+                    </Button>
+                  </div>
+                )}
+                {status !== 'pagado' && (
+                  <div title={editDisabledReason || ''}>
+                    <Button
+                      variant="outline"
+                      className={`w-full ${canEdit ? 'border-[#D4A5A5] text-[#D4A5A5] hover:bg-[#D4A5A5]/10' : 'border-gray-300 text-gray-400 cursor-not-allowed'}`}
+                      onClick={() => canEdit && openEditDialog(selectedProforma)}
+                      disabled={!canEdit}
+                      data-testid="edit-proforma-button"
+                    >
+                      {canEdit ? <Edit className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
+                      {editDisabledReason
+                        ? 'Solo el administrador puede editar proformas con abonos'
+                        : 'Editar Proforma'}
+                    </Button>
+                  </div>
+                )}
               </div>
-              <Button
-                variant="outline"
-                className="w-full border-[#D4A5A5] text-[#D4A5A5] hover:bg-[#D4A5A5]/10"
-                onClick={() => openEditDialog(selectedProforma)}
-                data-testid="edit-proforma-button"
-              >
-                <Edit className="mr-2 h-4 w-4" />
-                Editar Proforma
-              </Button>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
