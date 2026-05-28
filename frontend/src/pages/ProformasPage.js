@@ -38,6 +38,7 @@ export default function ProformasPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [editingPriceId, setEditingPriceId] = useState(null);
   const [editSaved, setEditSaved] = useState(false);
+  const [editQtyDisplayValues, setEditQtyDisplayValues] = useState({});
 
   const fetchProformas = async () => {
     try {
@@ -91,6 +92,7 @@ export default function ProformasPage() {
     setEditSaved(false);
     setEditSearchTerm('');
     setEditSearchResults([]);
+    setEditQtyDisplayValues({});
     setShowEditDialog(true);
   };
 
@@ -691,8 +693,12 @@ export default function ProformasPage() {
                 {editItems.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-4">No hay productos</p>
                 ) : (
-                  <div className="space-y-2">
-                    {editItems.map((item) => {
+                  <div className="relative">
+                    <div
+                      className="edit-items-list space-y-2 overflow-y-auto pr-1"
+                      style={{ maxHeight: '35vh' }}
+                    >
+                      {editItems.map((item) => {
                       const unitPrice = item.manualPrice && item.manualPrice > 0 ? item.manualPrice : item.product_price_1;
                       const isPriceManual = item.manualPrice && item.manualPrice > 0;
                       return (
@@ -711,7 +717,29 @@ export default function ProformasPage() {
                               <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => updateEditQuantity(item.product_id, item.quantity - 1)}>
                                 <Minus size={12} />
                               </Button>
-                              <span className="w-7 text-center text-sm font-medium">{item.quantity}</span>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={editQtyDisplayValues[item.product_id] !== undefined ? editQtyDisplayValues[item.product_id] : item.quantity}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  setEditQtyDisplayValues(prev => ({ ...prev, [item.product_id]: raw }));
+                                  const val = parseInt(raw, 10);
+                                  if (!isNaN(val) && val >= 1) updateEditQuantity(item.product_id, val);
+                                }}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  updateEditQuantity(item.product_id, (!isNaN(val) && val >= 1) ? val : 1);
+                                  setEditQtyDisplayValues(prev => { const n = { ...prev }; delete n[item.product_id]; return n; });
+                                }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                                className="edit-qty-input h-7 w-[52px] text-center text-sm font-medium border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#D4A5A5]"
+                                data-testid={`edit-qty-${item.product_id}`}
+                              />
                               <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => updateEditQuantity(item.product_id, item.quantity + 1)}>
                                 <Plus size={12} />
                               </Button>
@@ -749,6 +777,10 @@ export default function ProformasPage() {
                         </div>
                       );
                     })}
+                    </div>
+                    {editItems.length > 2 && (
+                      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent" />
+                    )}
                   </div>
                 )}
               </div>
@@ -788,6 +820,28 @@ export default function ProformasPage() {
       </Dialog>
 
       <BottomNav />
+
+      <style>{`
+        .edit-qty-input::-webkit-inner-spin-button,
+        .edit-qty-input::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .edit-qty-input {
+          -moz-appearance: textfield;
+        }
+        .edit-items-list {
+          scrollbar-width: thin;
+          scrollbar-color: #D4A5A5 transparent;
+        }
+        .edit-items-list::-webkit-scrollbar {
+          width: 4px;
+        }
+        .edit-items-list::-webkit-scrollbar-thumb {
+          background-color: #D4A5A5;
+          border-radius: 4px;
+        }
+      `}</style>
     </div>
   );
 }
