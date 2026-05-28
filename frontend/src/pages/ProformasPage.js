@@ -405,7 +405,7 @@ export default function ProformasPage() {
       {/* Proforma Detail Dialog */}
       <Dialog open={!!selectedProforma && !showPaymentDialog} onOpenChange={() => setSelectedProforma(null)}>
         <DialogContent
-          className="sm:max-w-lg overflow-y-auto"
+          className="sm:max-w-lg w-full overflow-y-auto overflow-x-hidden"
           style={{ maxHeight: '90vh', WebkitOverflowScrolling: 'touch' }}
         >
           <DialogHeader>
@@ -448,39 +448,40 @@ export default function ProformasPage() {
                     <CardContent className="p-4 space-y-2">
                       <p className="text-xs font-medium text-gray-500 uppercase">Cliente</p>
                       {selectedProforma.client_name && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <User size={14} className="text-gray-400" />
-                          {selectedProforma.client_name}
+                        <div className="flex items-start gap-2 text-sm min-w-0">
+                          <User size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                          <span className="break-words min-w-0">{selectedProforma.client_name}</span>
                         </div>
                       )}
                       {selectedProforma.client_id_number && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <IdCard size={14} className="text-gray-400" />
-                          <span className="text-gray-500 text-xs">Cédula/RUC:</span> {selectedProforma.client_id_number}
+                        <div className="flex items-start gap-2 text-sm min-w-0">
+                          <IdCard size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                          <span className="text-gray-500 text-xs shrink-0">Cédula/RUC:</span>
+                          <span className="break-words min-w-0 text-xs">{selectedProforma.client_id_number}</span>
                         </div>
                       )}
                       {selectedProforma.client_city && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <MapPin size={14} className="text-gray-400" />
-                          {selectedProforma.client_city}
+                        <div className="flex items-start gap-2 text-sm min-w-0">
+                          <MapPin size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                          <span className="break-words min-w-0">{selectedProforma.client_city}</span>
                         </div>
                       )}
                       {selectedProforma.client_phone && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Phone size={14} className="text-gray-400" />
-                          {selectedProforma.client_phone}
+                        <div className="flex items-start gap-2 text-sm min-w-0">
+                          <Phone size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                          <span className="break-words min-w-0">{selectedProforma.client_phone}</span>
                         </div>
                       )}
                       {selectedProforma.client_email && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail size={14} className="text-gray-400" />
-                          {selectedProforma.client_email}
+                        <div className="flex items-start gap-2 text-sm min-w-0">
+                          <Mail size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                          <span className="break-words min-w-0">{selectedProforma.client_email}</span>
                         </div>
                       )}
                       {selectedProforma.client_address && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <MapPin size={14} className="text-gray-400" />
-                          {selectedProforma.client_address}
+                        <div className="flex items-start gap-2 text-sm min-w-0">
+                          <MapPin size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                          <span className="break-words min-w-0">{selectedProforma.client_address}</span>
                         </div>
                       )}
                     </CardContent>
@@ -493,10 +494,15 @@ export default function ProformasPage() {
                   <div className="space-y-2">
                     {selectedProforma.items?.map((item, idx) => (
                       <div key={idx} className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-sm font-medium line-clamp-1">{item.product_name}</p>
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <div className="flex items-start gap-2">
+                          <p className="text-sm font-medium flex-1 min-w-0 break-words">{item.product_name}</p>
+                          <span className="text-sm font-medium text-[#1A1A1A] whitespace-nowrap shrink-0">{formatCurrency(item.subtotal)}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                           <span>{item.quantity} x {formatCurrency(item.unit_price_applied)}</span>
-                          <span className="font-medium text-[#1A1A1A]">{formatCurrency(item.subtotal)}</span>
+                          {item.price_was_manual && (
+                            <span className="text-amber-600">(especial)</span>
+                          )}
                         </div>
                       </div>
                     ))}
