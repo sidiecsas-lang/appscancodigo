@@ -420,7 +420,7 @@ export default function ProformasPage() {
           </DialogHeader>
 
           {selectedProforma && (
-            <div className="space-y-4 py-2">
+            <div className="space-y-4 py-2 min-w-0 w-full overflow-hidden">
                 {/* Status Card */}
                 <div className={`p-4 rounded-lg ${
                   selectedProforma.status === 'pagado' ? 'bg-green-50' :
@@ -546,7 +546,7 @@ export default function ProformasPage() {
               : null;
 
             return (
-              <div className="space-y-3 pt-4 border-t mt-2">
+              <div className="space-y-3 pt-4 border-t mt-2 min-w-0 w-full overflow-hidden">
                 {status !== 'pagado' && (
                   <div className="flex gap-3">
                     <Button
@@ -573,7 +573,7 @@ export default function ProformasPage() {
                   <div title={editDisabledReason || ''}>
                     <Button
                       variant="outline"
-                      className={`w-full ${canEdit ? 'border-[#D4A5A5] text-[#D4A5A5] hover:bg-[#D4A5A5]/10' : 'border-gray-300 text-gray-400 cursor-not-allowed'}`}
+                      className={`w-full whitespace-normal h-auto py-2 text-left ${canEdit ? 'border-[#D4A5A5] text-[#D4A5A5] hover:bg-[#D4A5A5]/10' : 'border-gray-300 text-gray-400 cursor-not-allowed'}`}
                       onClick={() => canEdit && openEditDialog(selectedProforma)}
                       disabled={!canEdit}
                       data-testid="edit-proforma-button"
